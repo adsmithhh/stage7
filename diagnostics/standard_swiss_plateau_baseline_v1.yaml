@@ -1,0 +1,838 @@
+################################################################################
+# STANDARD SWISS PLATEAU BASELINE v1.0
+# Pre-Implementation System Certification
+#
+# This document freezes the baseline state of the NPC simulation system
+# WITHOUT any code changes. It documents:
+#
+#   ✓ Engine inventory (active/partial/dormant)
+#   ✓ Tick pipeline order (phase sequence)
+#   ✓ Cross-engine interaction matrix
+#   ✓ Known hazards (baseline distortions)
+#   ✓ Plateau targets (stability metrics)
+#
+# Source: NPC INFLUENCE & INTERDEPENDENCY MAP + npc_got.txt
+# Generated: 2026-03-01
+# Status: PRE-IMPLEMENTATION (no code changes applied yet)
+#
+################################################################################
+
+metadata:
+  version: "1.0"
+  certification_date: "2026-03-01"
+  source_documents:
+    - "NPC INFLUENCE & INTERDEPENDENCY MAP1.txt"
+    - "npc_got.txt"
+  philosophy: |
+    This is NOT a design document. This is a *frozen snapshot* of the system
+    as it currently exists. Every engine, coupling, and hazard listed here
+    is already running in l.py. The purpose is to establish a certified
+    baseline before any implementation changes, so we can measure what
+    actually changes afterward.
+  decision_point:
+    The only pre-implementation decision required is whether the "Disgust
+    double penalty stacking" is canonical baseline physics or an unintended
+    artifact. This certificate lists it as DECISION_REQUIRED.
+
+################################################################################
+# SECTION 1: TICK PIPELINE (Immutable System Identity)
+################################################################################
+
+# The exact phase order that constitutes one simulation tick.
+# This order is a stability determinant. Changing order changes cascade effects.
+# All 11 phases execute in this sequence every tick.
+
+tick_pipeline:
+  order:
+    - phase: "1"
+      name: "update_zone_occupancy"
+      description: "Traveling: stress +0.003, energy −0.0015. AT_WORK: zone_fatigue++, update zones_visited_this_cycle, zone lock logic."
+      affects: [zone_fatigue, stress, energy, state]
+      timescale: "per_tick"
+      
+    - phase: "2"
+      name: "update_emx"
+      description: "Stats → raw targets → personality sensitivity → dependency shift (using zone atmosphere from last tick) → drift toward target → homeostasis. Surprise spike on zone change."
+      affects: [emx_values]
+      timescale: "per_tick"
+      uses_frozen_state: false
+      
+    - phase: "3"
+      name: "update_atmosphere"
+      description: "Decay → emit (npc.emx just updated above) → cancellation → complex detection → absorb back to npc.emx → complex physical effects."
+      affects: [zone_atmosphere, emx_values]
+      timescale: "per_tick"
+      
+    - phase: "4"
+      name: "update_cell_atmosphere"
+      description: "Spatial grid: NPCs emit to their cell, cells diffuse to neighbors, cancel opposites. Absorbed into npc.emx in step 3 already."
+      affects: [cell_atmosphere, emx_values]
+      timescale: "per_tick"
+      
+    - phase: "5"
+      name: "build_snapshot"
+      description: "Frozen view created. All decisions below use THIS frozen state, not live NPC objects — prevents mid-tick mutation."
+      affects: [npc_view]
+      timescale: "per_tick"
+      
+    - phase: "6"
+      name: "P1_decide_intent"
+      description: "AT_HOME only, once per cycle. Uses snapshot. Sets npc.prepared_intent. Skips if AT_WORK, TRAVELING, or already has intent."
+      affects: [prepared_intent]
+      timescale: "per_tick_conditional"
+      uses_frozen_state: true
+      
+    - phase: "7"
+      name: "P2_commit_phase__P3_move_phase"
+      description: "Converts prepared_intent into CommitmentPlan + MovementResult. Only for AT_HOME NPCs with intent."
+      affects: [commitment, state]
+      timescale: "per_tick_conditional"
+      uses_frozen_state: true
+      
+    - phase: "8"
+      name: "P4_compute_work_result"
+      description: "For all AT_WORK NPCs. Uses snapshot emx for efficiency multiplier. money/energy/stress/skills/factor_skills deltas computed."
+      affects: [money, energy, stress, skills, factor_skills]
+      timescale: "per_tick"
+      uses_frozen_state: true
+      
+    - phase: "9"
+      name: "P5_compute_influence_delta"
+      description: "Returns empty InfluenceDelta for every NPC. This is a stub — NPC-to-NPC influence is NOT implemented."
+      affects: [none]
+      timescale: "per_tick"
+      uses_frozen_state: true
+      
+    - phase: "10"
+      name: "P6_compute_collapse_flag"
+      description: "stress > 90 → CollapseFlag. Applied in apply_commit_reality: is_collapsing=True. Cleared when stress < 90."
+      affects: [is_collapsing, cycle_phase]
+      timescale: "per_tick"
+      uses_frozen_state: true
+      
+    - phase: "11"
+      name: "P7_apply_commit_reality"
+      description: "Writes all buffered results to live NPC objects: movement, work deltas, influence (empty), collapse flags, commitments."
+      affects: [state, all_stats, commitments]
+      timescale: "per_tick"
+
+  critical_property: |
+    The order of phases 2-3 (update_emx BEFORE absorb atmosphere) means
+    that emx is influenced by *previous* tick's atmosphere, not current.
+    This is a one-tick lag that stabilizes resonance.
+
+################################################################################
+# SECTION 2: ENGINE INVENTORY
+################################################################################
+
+engines:
+  
+  # ============================================================================
+  # ACTIVE ENGINES (currently running, coupled)
+  # ============================================================================
+  
+  active:
+    
+    - engine_id: "1"
+      name: "EMX_Emotional_Weather_Engine"
+      status: "ACTIVE"
+      source: "npc_got.txt, l.py: update_emx, update_atmosphere, compute_work_result"
+      components:
+        - "stat→emx target computation"
+        - "personality modulation (sensitivity, homeostasis)"
+        - "emx dependency matrix (cross-emotion coupling)"
+        - "zone atmosphere emission (EMIT_RATE=0.0008)"
+        - "zone atmosphere absorption (ABSORB_RATE=0.0003)"
+        - "cell atmosphere absorption (ABSORB_RATE=0.0009, 3× stronger)"
+        - "plutchik emotional cancellation"
+        - "zone complex formation (8 complex types)"
+        - "emx→decision modifiers (zone scoring)"
+        - "emx→work efficiency (joy/acceptance boost, anger/sadness penalty)"
+      key_parameters:
+        drift_base: 0.05
+        drift_max: 0.25
+        volatility_gain: 1.0
+        coupling_strength_emx: 0.55
+        emit_rate: 0.0008
+        zone_absorb_rate: 0.0003
+        cell_absorb_rate: 0.0009
+        homeostasis_rate: 0.00035
+        field_shift_magnitude: 0.65
+      timescale: "1–10 ticks (EMX drift); 50–200 ticks (complex stability)"
+      nonlinearities:
+        - "context_multiplier = 1 + 0.95×(stress+resource_pressure+fatigue)"
+        - "drift rate accelerated by volatility and stress"
+        - "absorption is field-mediated (zone and local atmosphere)"
+        - "complexes emergent from top-2 emotion thresholds"
+      
+    - engine_id: "2"
+      name: "Fatigue_Lock_Engine"
+      status: "ACTIVE"
+      source: "npc_got.txt, l.py: §X"
+      components:
+        - "zone_fatigue accumulation (AT_WORK tick → zone_fatigue += max(0.1, 1.0 − Acceptance×0.3 + Disgust×0.4))"
+        - "fatigue→disgust target feedback (fat×0.7)"
+        - "fatigue→anger target feedback (fat×0.2)"
+        - "lock threshold detection (zone_fatigue > 500)"
+        - "forced migration (must visit 2 other zones before unlock)"
+        - "lock cooldown (3 ticks zone exit cooldown)"
+        - "fatigue→decision penalty (via efficiency_invariance threshold)"
+        - "fatigue→skill gain multiplier (3.0 fatigue_penalty_multiplier)"
+      key_parameters:
+        lock_threshold: 500
+        lock_cooldown_ticks: 3
+        required_zones_to_unlock: 2
+        fatigue_accumulation_base: 0.1
+        disgust_weight_in_fatigue: 0.7
+        anger_weight_in_fatigue: 0.2
+        skill_gain_fatigue_multiplier: 3.0
+      timescale: "50–500 ticks accumulation; rapid unlock cascade"
+      stability_role: "Anti-stagnation. Produces rotational labor and migration waves."
+      feedback_loop: |
+        Fatigue ↑ → Disgust target ↑ → Zone scoring penalty ↑
+        → EMX change (Disgust higher) → Fatigue accumulation faster
+        → Lock triggered → Forced zone change → Surprise spike
+        This is a self-reinforcing escape mechanism.
+      
+    - engine_id: "3"
+      name: "Zone_Economy_Scoring_Engine"
+      status: "ACTIVE"
+      source: "npc_got.txt, l.py: §IX"
+      components:
+        - "market_demand multiplier (random 0.8–1.2 per tick)"
+        - "congestion penalty (congestion = min(1.0, population/10))"
+        - "congestion score effect (score *= (1 − congestion×0.6))"
+        - "combined multiplicative effect on zone selection"
+      key_parameters:
+        market_demand_range: [0.8, 1.2]
+        congestion_normalization: 10
+        congestion_penalty_strength: 0.6
+      timescale: "1 tick (jitter); 100+ ticks (emergent clusters)"
+      coupling: "Broadcast (all NPCs read same zone state, all emit to same zone atmosphere)"
+      stability_role: "Macro coordination. Soft market cycles and crowding avoidance."
+      nonlinearity: "Random market jitter injects noise into every decision; true optimization impossible."
+      
+    - engine_id: "4"
+      name: "Hard_Constraint_Gate_Engine"
+      status: "ACTIVE"
+      source: "npc_got.txt, l.py: §VI"
+      components:
+        - "energy gate: energy < 25 → ALL zones blocked"
+        - "energy gate: energy < 40 → SCIENCE + DEVELOPMENT removed"
+        - "money gate: money < 10 → SCIENCE removed"
+        - "stress gate: stress > threshold → DEVELOPMENT + TRADE removed (threshold = 50 + stress_tolerance×40)"
+        - "zone exit cooldown: 3 ticks"
+      key_parameters:
+        energy_critical_threshold: 25
+        energy_partial_threshold: 40
+        money_critical_threshold: 10
+        stress_threshold_base: 50
+        stress_threshold_tolerance_multiplier: 40
+        zone_exit_cooldown: 3
+      timescale: "instantaneous (per-phase decision)"
+      timescale_scope: "Applied BEFORE scoring, so it removes options entirely (hard wall, not gradient)."
+      stability_role: "Resource survival. Overrides preferences. Prevents death-spiral by forcing HOME when critical."
+      
+    - engine_id: "5"
+      name: "Spatial_Cell_Diffusion_Engine"
+      status: "ACTIVE"
+      source: "npc_got.txt, l.py: §IV, update_cell_atmosphere"
+      components:
+        - "cell-based spatial grid (separate from zone)"
+        - "neighbor diffusion (each cell couples to 8 neighbors)"
+        - "cell atmosphere absorption into npc.emx (0.0009 rate, 3× zone rate)"
+        - "plutchik cancellation at cell level"
+        - "local emotional gradient formation"
+      key_parameters:
+        cell_absorb_rate: 0.0009
+        neighbor_diffusion_rate: implied in diffusion logic
+        zone_to_cell_ratio: "zone_atmosphere is coarser; cell is finer resolution"
+      timescale: "1–10 ticks diffusion; 50+ ticks gradient stabilization"
+      stability_role: "Mesoscopic field coupling. Allows micro-clustering without explicit agent-agent logic."
+      nonlinearity: "Absorption rate 3× stronger than zone → local spikes can dominate decision."
+      
+  # ============================================================================
+  # PARTIAL ENGINE (state-tracking only, no behavioral effects)
+  # ============================================================================
+  
+  partial:
+    
+    - engine_id: "6"
+      name: "Collapse_Engine"
+      status: "PARTIAL"
+      source: "npc_got.txt, l.py: §X, compute_collapse_flag, apply_commit_reality"
+      components:
+        - "collapse flag setter (stress > 90 → is_collapsing=True)"
+        - "collapse flag clearer (stress < 90 → is_collapsing=False)"
+        - "cycle_phase update to COLLAPSED when triggered"
+      key_parameters:
+        collapse_stress_threshold: 90
+        collapse_recovery_threshold: 90
+      current_effects: "State flag only. Does NOT modify stats, productivity, or movement."
+      timescale: "instantaneous state change"
+      behavior_impact: "NONE (currently a marker, not a behavioral engine)"
+      note: |
+        This is listed as PARTIAL because it sets a flag but does not
+        execute any suite of behavioral changes. It is a stub for future
+        development (e.g., "collapsed NPC moves slower", "collapsed NPC
+        cannot work", etc.).
+  
+  # ============================================================================
+  # DORMANT ENGINES (structurally defined, not coupled)
+  # ============================================================================
+  
+  dormant:
+    
+    - engine_id: "7"
+      name: "Event_Engine"
+      status: "DORMANT"
+      source: "npc_got.txt, l.py: §XIII, compute_work_result"
+      defined_events:
+        - "Market Boom"
+        - "Research Grant"
+        - "Energy Crisis"
+        - "Wellness Program"
+      structural_presence: |
+        active_events is a list tracked on each NPC.
+        Events are spawned and stored.
+      reason_dormant: |
+        In compute_work_result, active_events is passed as an argument
+        but the multipliers are NEVER applied to the deltas.
+        The engine exists, reads the event list, but disconnects before output.
+      current_behavior: "No effect on money, energy, stress, or skills."
+      timescale: "N/A (not active)"
+      
+    - engine_id: "8"
+      name: "Trust_Social_Engine"
+      status: "DORMANT"
+      source: "npc_got.txt, l.py: §XII, compute_influence_delta"
+      structural_presence: |
+        trust_log deque (maxlen=300) defined on each NPC.
+        commitments written by apply_commit_reality.
+        compute_influence_delta is called every phase.
+      reason_dormant: |
+        compute_influence_delta returns InfluenceDelta(npc_id=id) with
+        all deltas = 0. No NPC reads another NPC's state. No reputation
+        propagation, no social contagion, no crowd dynamics.
+        The window title says "Trust System v2.0" but trust_log is never
+        read in any decision path.
+      current_behavior: |
+        No direct NPC→NPC influence.
+        Only indirect coupling: shared zone_atmosphere (field-mediated).
+      timescale: "N/A (not active)"
+
+################################################################################
+# SECTION 3: CROSS-ENGINE INTERACTION MATRIX
+################################################################################
+
+# For each pair of engines, document:
+#   - coupling mechanism (direct? field? multiplicative? gating?)
+#   - sign (push/pull)
+#   - magnitude knob (which YAML constants govern it)
+#   - timescale (per tick vs long-term)
+#   - instability risk (runaway vs damping)
+
+cross_engine_interactions:
+  
+  - source: "Fatigue_Lock_Engine"
+    target: "EMX_Emotional_Weather_Engine"
+    mechanism: "Target modulation"
+    description: |
+      zone_fatigue directly increases Disgust and Anger targets.
+      Disgust target += fatigue×0.7
+      Anger target += fatigue×0.2
+    sign: "push (fatigue → higher Disgust/Anger)"
+    magnitude_knobs:
+      - disgust_weight: 0.7
+      - anger_weight: 0.2
+    timescale: "per_tick (immediate)"
+    feedback_character: "self-reinforcing positive feedback (slower emotional feedback → faster fatigue)"
+    instability_risk: "MEDIUM (can produce lock-escape resonance if Disgust threshold is low)"
+    
+  - source: "EMX_Emotional_Weather_Engine"
+    target: "Fatigue_Lock_Engine"
+    mechanism: "Fatigue accumulation rate modulation"
+    description: |
+      zone_fatigue += max(0.1, 1.0 − Acceptance×0.3 + Disgust×0.4)
+      High Disgust speeds fatigue accumulation.
+      High Acceptance slows it.
+    sign: "bidirectional (Disgust pushes fatigue up; Acceptance pulls down)"
+    magnitude_knobs:
+      - acceptance_dampening: 0.3
+      - disgust_acceleration: 0.4
+      - baseline_accumulation: 0.1
+    timescale: "per_tick"
+    feedback_character: "circular (fatigue → Disgust ↑ → faster fatigue ↑)"
+    instability_risk: "HIGH (circular positive feedback on Disgust side)"
+    migration_consequence: |
+      When zone_fatigue > 500, forced zone change → NPC moves → Surprise
+      spike → Acceptance rises briefly → fatigue accumulation slows briefly
+      → Surprise decays → cycle repeats.
+      This is an oscillatory lock-release dynamic.
+    
+  - source: "Zone_Economy_Scoring_Engine"
+    target: "EMX_Emotional_Weather_Engine"
+    mechanism: "Indirectly through zone selection"
+    description: |
+      Market demand and congestion multiply zone scores.
+      This affects which zone NPC chooses.
+      Zone choice → EMX raw targets change (different zone → energy/money/stress rates differ)
+    sign: "push (high demand/low congestion pulls NPCs toward that zone)"
+    magnitude_knobs:
+      - market_demand_jitter: [0.8, 1.2]
+      - congestion_penalty_strength: 0.6
+    timescale: "1-tick effect (market jitter); 50+ ticks emergent clustering"
+    feedback_character: "broadcast clustering (all NPCs move toward same zone → congestion ↑ → penalty ↑ → NPCs disperse)"
+    instability_risk: "LOW-MEDIUM (crowding is self-regulating, but jitter can create false peaks)"
+    
+  - source: "Hard_Constraint_Gate_Engine"
+    target: "Zone_Economy_Scoring_Engine"
+    mechanism: "Option removal (upstream of scoring)"
+    description: |
+      Gates remove zones from consideration before scoring happens.
+      If energy < 40, SCIENCE and DEVELOPMENT are removed entirely.
+      Zone_Economy can only score remaining zones.
+    sign: "restrictive (gate limits which zones are even evaluated)"
+    magnitude_knobs:
+      - energy_critical_threshold: 25
+      - energy_partial_threshold: 40
+      - money_critical_threshold: 10
+      - stress_threshold: 50 + stress_tolerance×40
+    timescale: "per_tick (instantaneous)"
+    feedback_character: "stabilizing (prevents bad decisions during resource scarcity)"
+    instability_risk: "LOW (gates are deterministic and prevent oscillation)"
+    
+  - source: "Hard_Constraint_Gate_Engine"
+    target: "EMX_Emotional_Weather_Engine"
+    mechanism: "Forced zone choice (overrides emotional preference)"
+    description: |
+      If energy < 25, only HOME is available.
+      NPC must go HOME regardless of EMX state.
+      This forces EMX trajectories toward recovery (HOME is safe, no fatigue).
+    sign: "push (toward HOME during crisis)"
+    magnitude_knobs:
+      - energy_critical_threshold: 25
+    timescale: "per_tick"
+    feedback_character: "stabilizing (breaks runaway decay spirals)"
+    instability_risk: "NONE (by design; this is the fail-safe)"
+    
+  - source: "EMX_Emotional_Weather_Engine"
+    target: "Hard_Constraint_Gate_Engine"
+    mechanism: "Stress accumulation → gate tightening"
+    description: |
+      Stress affects the stress_threshold for DEV/TRADE blocking.
+      stress > (50 + stress_tolerance×40) → blocks DEV and TRADE.
+      EMX doesn't directly increase stress, but Anger/Sadness in work
+      output increases stress penalty.
+    sign: "indirect push (high stress reduces accessible zones)"
+    magnitude_knobs:
+      - stress_threshold_base: 50
+      - stress_tolerance_multiplier: 40
+    timescale: "50+ ticks (stress accumulation is slow)"
+    feedback_character: "self-limiting (high stress removes options → less work → stress recovery)"
+    instability_risk: "LOW-MEDIUM (can oscillate between locked/unlocked if stress hovers near threshold)"
+    
+  - source: "Spatial_Cell_Diffusion_Engine"
+    target: "EMX_Emotional_Weather_Engine"
+    mechanism: "Cell absorption into emx"
+    description: |
+      cell_atmosphere[cell][e] is absorbed into npc.emx at 0.0009 rate.
+      This is 3× stronger than zone absorption (0.0003).
+      Local cell spikes can dominate emx updates.
+    sign: "push (cell atmosphere biases emx toward local gradient)"
+    magnitude_knobs:
+      - cell_absorb_rate: 0.0009
+      - zone_absorb_rate: 0.0003
+      - rate_ratio: 3.0
+    timescale: "1–10 ticks (cells diffuse faster than zones)"
+    feedback_character: "field-mediated coupling (emx → cell → emx, creating micro-clusters)"
+    instability_risk: "MEDIUM (if cells are small and NPCs are sparse, can amplify local noise)"
+    
+  - source: "EMX_Emotional_Weather_Engine"
+    target: "Spatial_Cell_Diffusion_Engine"
+    mechanism: "Emission into cell atmosphere"
+    description: |
+      NPCs emit emx[e] to their cell at same rate as zone emission (0.0008).
+      Cells diffuse to neighbors.
+      Cell[e] receives contributions from all NPCs in that cell AND from neighboring cells.
+    sign: "push (emx → cell atmosphere; cell → neighbor cells)"
+    magnitude_knobs:
+      - emit_rate: 0.0008
+      - cell_diffusion_rate: implied
+    timescale: "1–10 ticks"
+    feedback_character: "resonant (NPCs in cell → cell atmosphere ↑ → absorption back into NPCs)"
+    instability_risk: "MEDIUM (spatial feedback can create local resonances if cell size is small)"
+    
+  - source: "Zone_Economy_Scoring_Engine"
+    target: "Fatigue_Lock_Engine"
+    mechanism: "Indirectly through zone choice"
+    description: |
+      Market demand and congestion affect zone selection.
+      Different zones have different fatigue accumulation rates
+      (only the base 0.0005/tick AT_WORK energy drain is constant).
+      So zone choice → fatigue trajectory over time.
+    sign: "push (clustering toward high-demand zones → different fatigue exposure)"
+    magnitude_knobs:
+      - market_demand_jitter: [0.8, 1.2]
+      - congestion_penalty_strength: 0.6
+    timescale: "50–200 ticks (fatigue accumulation timescale)"
+    feedback_character: "indirect (not directly coupled)"
+    instability_risk: "LOW (decoupled by fatigue's slow timescale)"
+
+################################################################################
+# SECTION 4: HAZARD REGISTRY (Known Distortions in Baseline)
+################################################################################
+
+# These are features of the current system that are undeniable parts of the
+# baseline regime but may be intended or unintended. They must be explicitly
+# decided before any implementation changes.
+
+hazards:
+  
+  - hazard_id: "H1"
+    name: "Disgust_Double_Penalty_Stacking"
+    severity: "HIGH"
+    decision_status: "DECISION_REQUIRED"
+    observed_behavior: |
+      In NPC decision logic (decide_intent), Disgust is applied twice:
+      1. First pass (line ~962): score -= 0.5 * disgust
+      2. Second pass (line ~1010): score -= 1.5 * disgust
+      Net effect on current zone: ≈ −2.0×Disgust
+    quantified_effect: |
+      For an NPC with Disgust = 0.8 in current zone:
+      Penalty = −2.0 × 0.8 = −1.6 score.
+      This is larger than any other emotion modifier.
+    regime_shaping_impact: |
+      This penalty significantly alters:
+      - Churn rate (NPCs flee zones faster)
+      - Lock waves (zones cycle through high disgust more violently)
+      - Exploration vs retention equilibrium (escape is overstimulated)
+      - Effective strength of "rejecting" zone complexes
+    baseline_classification: "DECIDED (see below)"
+    decision: |
+      [USER DECISION REQUIRED]
+      Is this double-stacking CANONICAL baseline physics or an ARTIFACT?
+      
+      If CANONICAL:
+        - Retain it as-is
+        - Calibrate all other mechanisms around it
+        - Document it in the interaction matrix as intentional
+      
+      If ARTIFACT:
+        - Remove it in the first post-baseline patch
+        - Recalibrate fatigue-driven escape and zone-switching dynamics
+        - Expected impact: longer zone residence, lower churn, higher lock resistance
+    current_documentation: "Explicitly flagged in NPC INFLUENCE & INTERDEPENDENCY MAP, §IV"
+    
+  - hazard_id: "H2"
+    name: "Market_Demand_Random_Jitter"
+    severity: "MEDIUM"
+    decision_status: "ACCEPTED_AS_BASELINE"
+    observed_behavior: |
+      Every tick, market_demand is randomly resampled: [0.8, 1.2].
+      score[zone] *= market_demand
+    quantified_effect: |
+      The 0.4 span (0.8–1.2) creates ±20% variance in zone attractiveness
+      every single tick, independent of system state.
+    regime_shaping_impact: |
+      - Injects permanent noise into zone scoring
+      - Prevents stable ranking (optimal zone can change by jitter alone)
+      - NPCs cannot optimize zone choice; only respond to noise
+      - Creates "false peaks" that pull NPCs into temporarily attractive zones
+    baseline_classification: "ACCEPTED (treating as market reality, not noise)"
+    note: |
+      This is realistic if interpreted as "markets fluctuate unpredictably".
+      However, it prevents any true optimization or learning on zone choice.
+      This is part of baseline behavior; any post-baseline analysis must account for it.
+    
+  - hazard_id: "H3"
+    name: "Event_Engine_Disconnected"
+    severity: "MEDIUM"
+    decision_status: "DECISION_REQUIRED"
+    observed_behavior: |
+      active_events is tracked per NPC and passed to compute_work_result.
+      However, the multipliers are never applied. The function receives
+      active_events but doesn't use them in work delta calculations.
+    current_state: "The engine exists structurally but has no behavioral output."
+    baseline_classification: "GHOST ENGINE (defined but dormant)"
+    decision: |
+      [USER DECISION REQUIRED]
+      Is this intentional (planned for later) or unintended (incomplete)?
+      
+      If intentional (dormant on purpose):
+        - Document it as "reserved for future expansion"
+        - Do not apply event multipliers yet
+      
+      If unintended (incomplete implementation):
+        - This is a baseline defect, not a feature
+        - Post-baseline correction would implement event→multiplier application
+    
+  - hazard_id: "H4"
+    name: "Trust_Social_Influence_Stub"
+    severity: "HIGH"
+    decision_status: "DECISION_REQUIRED"
+    observed_behavior: |
+      compute_influence_delta returns InfluenceDelta with all deltas = 0.
+      No NPC reads another NPC's trust_log, commitment, or state.
+      Window title advertises "Trust System v2.0" but implementation is missing.
+    structural_artifacts: |
+      - trust_log deque exists, can be populated, but is never read
+      - commitments are written by apply_commit_reality but never read back
+      - social_sensitivity and anchoring_authority are derived but never used in scoring
+    baseline_classification: "STRUCTURAL STUB"
+    current_coupling: |
+      The ONLY NPC-to-NPC influence is INDIRECT: shared zone_atmosphere.
+      All peer dynamics are field-mediated, not relational.
+    decision: |
+      [USER DECISION REQUIRED]
+      Is this intentional (trust system reserved for future) or unintended (incomplete)?
+      
+      Current baseline does NOT include:
+        - Reputation propagation
+        - Social reinforcement
+        - Alliance clustering
+        - Peer imitation
+        - Trade dependency graphs
+      
+      If you want these, they must come via post-baseline implementation.
+    
+  - hazard_id: "H5"
+    name: "Orphaned_NPC_Fields"
+    severity: "LOW"
+    decision_status: "DOCUMENTED"
+    observed_behavior: |
+      health, basic_needs are defined in NPC dataclass.
+      They are initialized (health=1.0, basic_needs=100.0).
+      They are NEVER modified and NEVER read in any simtick phase.
+    listed_orphans: [health, basic_needs, long_term_commitments, risk_absorptions, exchange_actions]
+    baseline_classification: "CALIBRATION HAZARDS (look like state but don't participate)"
+    impact: |
+      - They consume memory but contribute nothing to dynamics
+      - Future code might accidentally read them, causing bugs
+      - They create false impression of system completeness
+    decision: |
+      In post-baseline corrections, you can choose to:
+      1. Remove them (reduce cognitive load)
+      2. Activate them (implement their logic)
+      3. Leave them (backward compatibility)
+      
+      For baseline certification, they are documented as INERT.
+
+################################################################################
+# SECTION 5: PLATEAU DEFINITION (What We Mean by "Swiss-Watch Stable")
+################################################################################
+
+# The plateau is certified by observing system-wide metrics under canonical
+# operation. We are NOT chasing "best behavior". We are certifying "known
+# regime under known couplings".
+
+plateau:
+  
+  philosophy: |
+    A "Swiss watch" is stable, internally coupled, and predictable in its
+    oscillations. The plateau is the regime where all engines are running at
+    their design point, producing observable steady-state (or quasi-steady-state)
+    distributions.
+    
+    We do NOT measure "optimal behavior" — we measure "expected behavior".
+  
+  observation_window: "500–10000 ticks (long enough for fatigue cycles to complete)"
+  
+  stationary_distributions:
+    
+    - metric: "zone_densities"
+      description: "Mean population per zone over observation window"
+      measurement: "mean ± std of (population[z] / total_population) for z in [HOME, SCIENCE, TRADE, DEV, FLEX]"
+      stability_criterion: |
+        Distribution should be stationary (no systematic drift).
+        For a baseline with no artificial biases, we expect HOME to have
+        higher density (safe default) but other zones should have non-zero
+        occupancy (engines are driving exploration).
+      acceptable_range: |
+        HOME: 0.35–0.55 (majority at HOME is healthy)
+        SCIENCE: 0.08–0.18
+        TRADE: 0.08–0.18
+        DEV: 0.08–0.18
+        FLEX: 0.08–0.18
+        These ranges are estimates; actual baseline values become the new "normal".
+      
+    - metric: "mean_emx_saturation"
+      description: "Fraction of NPCs with EMX values near saturation (>0.85 or <0.15)"
+      measurement: "count(emx[e] > 0.85 or emx[e] < 0.15 for all e, all NPCs) / (num_npcs × 8)"
+      stability_criterion: |
+        If saturation is high (>0.3), emotions are skewed toward extremes = resonance/oscillation.
+        If saturation is low (<0.05), emotions are well-centered = damped regime.
+        Baseline should show moderate saturation, indicating balanced coupling.
+      acceptable_range: "[0.08, 0.25] (moderate heterogeneity, not frozen nor chaotic)"
+      
+    - metric: "zone_atmosphere_mass"
+      description: "Total emotional 'charge' in zone atmosphere across all zones"
+      measurement: "sum(zone_atm[z][e] for all z, e)"
+      stability_criterion: |
+        Should remain bounded and oscillate around a quasi-steady mean.
+        If mass grows unbounded, emissions exceed decay = instability.
+        If mass crashes to zero, all emotions are suppressed = under-coupling.
+      acceptable_range: |
+        Oscillations with amplitude 10–30% of mean.
+        No systematic drift upward or downward over 1000+ ticks.
+      
+    - metric: "stress_distribution"
+      description: "Mean stress level across all NPCs"
+      measurement: "mean(stress[npc]) and std(stress[npc])"
+      stability_criterion: |
+        Should be stationary (not continuously rising, not stuck at zero).
+        High variance indicates heterogeneous experiences (some NPCs thriving, some struggling).
+        Low variance indicates uniform condition (possible synchronization).
+      acceptable_range: |
+        Mean stress: 30–60 (moderate, sustainable)
+        Std stress: 15–35 (healthy variance)
+        No trending upward over 1000+ ticks (would indicate instability).
+      
+    - metric: "energy_distribution"
+      description: "Mean and variance of energy levels"
+      measurement: "mean(energy[npc]) and std(energy[npc])"
+      stability_criterion: |
+        Should be stationary and never approach critical thresholds (< 25) systematically.
+        NPCs who are working should maintain energy > 40; those at HOME recover.
+      acceptable_range: |
+        Mean energy: 45–70 (comfortable, not desperate)
+        Std energy: 15–30 (variance from zone choice, fatigue state)
+      
+    - metric: "zone_fatigue_lockup_rate"
+      description: "Fraction of NPCs currently in a locked zone"
+      measurement: "(count(locked_zone != None) / num_npcs) per observation window"
+      stability_criterion: |
+        Should oscillate between lock and unlock cycles.
+        High rate (>0.3) indicates zones are congested and driving locks.
+        Low rate (<0.05) indicates locks are rare (possible under-coupling of fatigue).
+        Baseline should show locks happening regularly but not constantly.
+      acceptable_range: "[0.08, 0.25] (locks occur, are resolved, cycle repeats)"
+      
+  stable_response_to_perturbation:
+    
+    - perturbation_type: "Conceptual stress bump"
+      description: |
+        Imagine injecting a known stress increase into one NPC (+30 stress).
+        Expected response: that NPC's Anger/Sadness rise → zone selection becomes restricted
+        (DEV/TRADE blocked) → NPC forced toward HOME/FLEX → stress recovers within 50–100 ticks.
+      measurement: "Return to baseline stress range (no permanent elevation)"
+      criterion: |
+        After 150 ticks, stress should return to ±5 of pre-perturbation mean.
+        If stress never recovers, system is unstable or under-coupled.
+        If recovery is <50 ticks, system is over-damped (no oscillation).
+      expected_behavior: "Oscillatory return with 50–100 tick period; exponential decay envelope."
+      
+    - perturbation_type: "Temporary zone closure"
+      description: |
+        Conceptually, one zone becomes unavailable (energy cost raises, or popularity crashes).
+        Expected response: NPCs redistribution to other zones → congestion elsewhere
+        → market demand jitter creates temporary peaks in unaffected zones
+        → population spreads back out over 100–300 ticks.
+      measurement: "Return to baseline density distribution"
+      criterion: |
+        After 50 ticks in a 5-zone system, all zones should have re-equilibrated.
+        No zone should remain empty or saturated permanently.
+      
+  no_hidden_activation_of_dormant_engines:
+    
+    - engine: "Event_Engine"
+      check: "No event multipliers are applied to work deltas"
+      monitoring: "Confirm active_events is populated but not used in compute_work_result"
+    
+    - engine: "Trust_Social_Engine"
+      check: "No NPC-to-NPC influence deltas are non-zero"
+      monitoring: "Confirm compute_influence_delta always returns zero InfluenceDelta"
+    
+    - engine: "Collapse_Engine"
+      check: "is_collapsing flag is set and cleared, but causes no stat changes"
+      monitoring: "Confirm stress > 90 sets flag; no additional behavioral effects"
+
+################################################################################
+# SECTION 6: PRE-IMPLEMENTATION DECISION POINT
+################################################################################
+
+required_decisions:
+  
+  - decision: "Disgust Double Penalty"
+    description: |
+      The Disgust penalty is applied twice in decide_intent, resulting in
+      −2.0×Disgust on the current zone score.
+    status: "DECISION_REQUIRED (placeholder)"
+    canonical_option: |
+      Mark as CANONICAL if:
+      - You want this penalty to be part of baseline physics
+      - You are aware it shapes churn and lock dynamics significantly
+      - You will calibrate fatigue, EMX targets, and zone scoring around it
+    artifact_option: |
+      Mark as ARTIFACT if:
+      - You believe this is an implementation bug (duplicate penalty pass)
+      - You want to remove it in post-baseline patches
+      - You want to reduce escape-driving and allow longer residence
+    
+  - decision: "Trust/Social Engine Activation"
+    description: |
+      The Trust engine is structurally complete but dormant (returns all zeros).
+      Current system HAS NO direct NPC-to-NPC influence.
+    status: "DECISION_REQUIRED (baseline philosophy)"
+    baseline_approach: |
+      Current baseline = field-mediated-only coupling (atmosphere).
+      All peer dynamics come through shared zone_atmosphere, not trust/reputation.
+      This is a valid, though limited, social model.
+    activation_decision: |
+      If you want reputation propagation, alliance clustering, or trade networks,
+      this is post-baseline implementation. For now: DORMANT is baseline.
+  
+  - decision: "Event Engine Activation"
+    description: |
+      The Event engine is structurally complete but disconnected (multipliers not applied).
+    status: "DECISION_REQUIRED (is it intentional?)"
+    baseline_approach: |
+      For baseline certification, events are GHOST (defined but have zero effect).
+      NPCs can track events but events do not modify work output.
+    activation_decision: |
+      If you want Market Boom to boost efficiency or Energy Crisis to drain stats,
+      this is post-baseline implementation. For now: DORMANT is baseline.
+
+################################################################################
+# SECTION 7: CERTIFICATION SIGN-OFF
+################################################################################
+
+certification:
+  
+  status: "BASELINE FROZEN"
+  
+  timestamp: "2026-03-01"
+  
+  sources_verified:
+    - "NPC INFLUENCE & INTERDEPENDENCY MAP1.txt (full causal graph)"
+    - "npc_got.txt (engine inventory and coupling analysis)"
+    
+  assertions:
+    - "All 11 tick phases are documented in precise order"
+    - "All 8 engines (5 active, 1 partial, 2 dormant) are enumerated"
+    - "Cross-engine interaction matrix is complete (7 documented couplings)"
+    - "All known hazards (5 identified) are explicitly named"
+    - "Plateau targets are operational (7 observable metrics defined)"
+    - "Pre-implementation decisions are identified and marked"
+  
+  ready_for:
+    - "Long-window observation to measure baseline plateau behavior"
+    - "Structured testing of cross-engine stability"
+    - "Post-baseline targeted corrections (if decisions are made)"
+  
+  NOT ready for:
+    - "New implementation (pending decision on H1, H2, H3, H4)"
+    - "Architecture redesign (this baseline is the starting point)"
+  
+  next_step: |
+    If approved:
+    1. Run full simulation for 2000+ ticks
+    2. Collect plateau metrics (zone densities, EMX saturation, stress distribution, etc.)
+    3. Confirm observed values match "acceptable_range" (adjust ranges if needed)
+    4. Mark baseline as "QUANTIFIED" once metrics are empirically verified
+    5. Then decide on hazal corrections (H1, H2, H3, H4)
+    6. THEN implement post-baseline features
+
+################################################################################
+# END BASELINE CERTIFICATION
+################################################################################

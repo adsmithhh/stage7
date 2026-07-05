@@ -1,0 +1,51 @@
+# HSV/HSL-like mapping; val/brightness and sat can be modulated by A, D, or intensity
+emotion_colors:
+  joy:
+    hue: 55      # yellow
+    saturation: 0.9
+    value: 1.0
+
+  love:
+    hue: 340     # warm pink
+    saturation: 0.8
+    value: 0.95
+
+  calm:
+    hue: 180     # teal
+    saturation: 0.4
+    value: 0.8
+
+  pride:
+    hue: 45      # gold
+    saturation: 0.8
+    value: 0.9
+
+  anger:
+    hue: 0       # red
+    saturation: 0.95
+    value: 0.95
+
+  fear:
+    hue: 280     # violet
+    saturation: 0.8
+    value: 0.9
+
+  panic:
+    hue: 310     # bright magenta
+    saturation: 1.0
+    value: 1.0
+
+  sadness:
+    hue: 220     # dark blue
+    saturation: 0.7
+    value: 0.5
+
+  shame:
+    hue: 260     # muted purple
+    saturation: 0.4
+    value: 0.5
+
+  exhaustion:
+    hue: 210     # gray-blue
+    saturation: 0.2
+    value: 0.4

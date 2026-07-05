@@ -1,0 +1,48 @@
+# Core emotional space
+pad:
+  axes:
+    - P   # Pleasure
+    - A   # Arousal
+    - D   # Dominance
+
+# Which axis each strong emotion overrides
+emotion_axis_map:
+  joy:
+    replace: P
+    axes: [joy, A, D]
+
+  love:
+    replace: P
+    axes: [love, A, D]
+
+  anger:
+    replace: P
+    axes: [anger, A, D]
+
+  fear:
+    replace: D
+    axes: [P, A, fear]
+
+  sadness:
+    replace: D
+    axes: [P, A, sadness]
+
+  shame:
+    replace: D
+    axes: [P, A, shame]
+
+  pride:
+    replace: D
+    axes: [P, A, pride]
+
+  panic:
+    replace: A
+    axes: [P, panic, D]
+
+  exhaustion:
+    replace: A
+    axes: [P, exhaustion, D]
+
+  calm:
+    replace: A
+    axes: [P, calm, D]

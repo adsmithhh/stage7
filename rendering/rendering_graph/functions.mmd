@@ -1,0 +1,256 @@
+%%{init: {
+    "theme": "base",
+    "themeVariables": {
+        "primaryColor": "#ffffff",
+        "primaryTextColor": "#00a000",
+        "primaryBorderColor": "#00a000",
+        "lineColor": "#00a000",
+        "textColor": "#00a000",
+        "clusterBkg": "#ffffff",
+        "clusterBorder": "#00a000"
+    },
+    "flowchart": {
+        "htmlLabels": false,
+        "useMaxWidth": false,
+        "nodeSpacing": 40,
+        "rankSpacing": 80,
+        "curve": "basis"
+    }
+}}%%
+flowchart TD
+    FILE[rendering.py]
+    subgraph group_build[build layer]
+    build_anchor_field_primitives[_build_anchor_field_primitives]
+    FILE --> build_anchor_field_primitives
+    build_atmosphere_halo_primitives[_build_atmosphere_halo_primitives]
+    FILE --> build_atmosphere_halo_primitives
+    build_npc_primitives[_build_npc_primitives]
+    FILE --> build_npc_primitives
+    build_frame_render_packet[build_frame_render_packet]
+    FILE --> build_frame_render_packet
+    build_snapshot_lines[_build_snapshot_lines]
+    FILE --> build_snapshot_lines
+    build_vertical_edge_tabs[_build_vertical_edge_tabs]
+    FILE --> build_vertical_edge_tabs
+    build_edge_tabs[_build_edge_tabs]
+    FILE --> build_edge_tabs
+    build_horizontal_scrollbar_metrics[build_horizontal_scrollbar_metrics]
+    FILE --> build_horizontal_scrollbar_metrics
+    end
+    subgraph group_compact[compact]
+    compact_world_tab_label[_compact_world_tab_label]
+    FILE --> compact_world_tab_label
+    end
+    subgraph group_compute[compute layer]
+    compute_zone_sector_weather[compute_zone_sector_weather]
+    FILE --> compute_zone_sector_weather
+    end
+    subgraph group_configure[configure]
+    configure_runtime[configure_runtime]
+    FILE --> configure_runtime
+    end
+    subgraph group_draw[draw layer]
+    draw_anchor_fields[draw_anchor_fields]
+    FILE --> draw_anchor_fields
+    draw_circle_primitives_software[_draw_circle_primitives_software]
+    FILE --> draw_circle_primitives_software
+    draw_atmosphere[draw_atmosphere]
+    FILE --> draw_atmosphere
+    draw_atmosphere_indicators[draw_atmosphere_indicators]
+    FILE --> draw_atmosphere_indicators
+    draw_npcs[draw_npcs]
+    FILE --> draw_npcs
+    draw_anchors[draw_anchors]
+    FILE --> draw_anchors
+    draw_statistics_dashboard[draw_statistics_dashboard]
+    FILE --> draw_statistics_dashboard
+    draw_npc_inspector[draw_npc_inspector]
+    FILE --> draw_npc_inspector
+    draw_alpha_rect[draw_alpha_rect]
+    FILE --> draw_alpha_rect
+    draw_atmosphere_legend_corner[draw_atmosphere_legend_corner]
+    FILE --> draw_atmosphere_legend_corner
+    draw_corner_panels[draw_corner_panels]
+    FILE --> draw_corner_panels
+    draw_emx_panel[draw_emx_panel]
+    FILE --> draw_emx_panel
+    draw_weather_panel[draw_weather_panel]
+    FILE --> draw_weather_panel
+    draw_cell_grid_overlay[draw_cell_grid_overlay]
+    FILE --> draw_cell_grid_overlay
+    draw_tuning_panel[draw_tuning_panel]
+    FILE --> draw_tuning_panel
+    draw_game_snapshot_panel[draw_game_snapshot_panel]
+    FILE --> draw_game_snapshot_panel
+    draw_controls_panel[draw_controls_panel]
+    FILE --> draw_controls_panel
+    draw_edge_tabs[draw_edge_tabs]
+    FILE --> draw_edge_tabs
+    draw_load_menu[draw_load_menu]
+    FILE --> draw_load_menu
+    end
+    subgraph group_env[environment state]
+    env_state[_env_state]
+    FILE --> env_state
+    end
+    subgraph group_format[format layer]
+    format_zone_distribution[_format_zone_distribution]
+    FILE --> format_zone_distribution
+    format_zone_complexes[_format_zone_complexes]
+    FILE --> format_zone_complexes
+    end
+    subgraph group_horizontal[horizontal]
+    horizontal_scroll_from_thumb_left[horizontal_scroll_from_thumb_left]
+    FILE --> horizontal_scroll_from_thumb_left
+    end
+    subgraph group_render[render layer]
+    render_view[render_view]
+    FILE --> render_view
+    end
+    subgraph group_reset[reset layer]
+    reset_runtime_state[reset_runtime_state]
+    FILE --> reset_runtime_state
+    end
+    subgraph group_resolve[resolve layer]
+    resolve_weather_timeline_zone[resolve_weather_timeline_zone]
+    FILE --> resolve_weather_timeline_zone
+    resolve_edge_tab_action[resolve_edge_tab_action]
+    FILE --> resolve_edge_tab_action
+    end
+    subgraph group_runtime[runtime state]
+    runtime_state[_runtime_state]
+    FILE --> runtime_state
+    end
+    subgraph group_save[save layer]
+    save_npc_state[save_npc_state]
+    FILE --> save_npc_state
+    save_start_npc_state_once[save_start_npc_state_once]
+    FILE --> save_start_npc_state_once
+    end
+    subgraph group_sim[simulation state]
+    sim_state[_sim_state]
+    FILE --> sim_state
+    end
+    subgraph group_snapshot[snapshot]
+    snapshot_wrap[_snapshot_wrap]
+    FILE --> snapshot_wrap
+    snapshot_line_color[_snapshot_line_color]
+    FILE --> snapshot_line_color
+    end
+    subgraph group_stable[stable]
+    stable_phase_seed[_stable_phase_seed]
+    FILE --> stable_phase_seed
+    end
+    subgraph group_view[view]
+    view_tab_color[_view_tab_color]
+    FILE --> view_tab_color
+    end
+    subgraph EXTERNALS[Imported call targets]
+    external_EMX_COLORS[EMX_COLORS]
+    external_EMX_COMPLEX_ZONE_THRESHOLD_SCALE[EMX_COMPLEX_ZONE_THRESHOLD_SCALE]
+    external_NPC_DYAD_COLORS[NPC_DYAD_COLORS]
+    external_PERSONALITY_COLORS[PERSONALITY_COLORS]
+    external_color_map[color_map]
+    external_compute_anchor_field[compute_anchor_field]
+    external_compute_emx_archetype[compute_emx_archetype]
+    external_constants[constants]
+    external_datetime[datetime]
+    external_json[json]
+    external_math[math]
+    external_os[os]
+    external_pygame[pygame]
+    external_tuning[tuning]
+    end
+    draw_anchor_fields --> build_anchor_field_primitives
+    draw_anchor_fields --> draw_circle_primitives_software
+    env_state --> runtime_state
+    sim_state --> runtime_state
+    build_anchor_field_primitives --> stable_phase_seed
+    build_anchor_field_primitives --> external_compute_anchor_field
+    build_anchor_field_primitives --> external_math
+    build_atmosphere_halo_primitives --> env_state
+    build_npc_primitives --> external_math
+    draw_circle_primitives_software --> external_pygame
+    build_frame_render_packet --> build_anchor_field_primitives
+    build_frame_render_packet --> build_atmosphere_halo_primitives
+    build_frame_render_packet --> build_npc_primitives
+    draw_atmosphere --> build_atmosphere_halo_primitives
+    draw_atmosphere --> draw_circle_primitives_software
+    draw_atmosphere --> draw_atmosphere_indicators
+    draw_atmosphere_indicators --> env_state
+    draw_atmosphere_indicators --> external_pygame
+    draw_npcs --> build_npc_primitives
+    draw_npcs --> draw_circle_primitives_software
+    draw_anchors --> external_color_map
+    draw_anchors --> external_pygame
+    draw_statistics_dashboard --> external_math
+    draw_statistics_dashboard --> external_pygame
+    draw_npc_inspector --> external_EMX_COLORS
+    draw_npc_inspector --> external_NPC_DYAD_COLORS
+    draw_npc_inspector --> external_PERSONALITY_COLORS
+    draw_npc_inspector --> external_math
+    draw_npc_inspector --> external_pygame
+    draw_alpha_rect --> external_pygame
+    draw_atmosphere_legend_corner --> env_state
+    draw_atmosphere_legend_corner --> draw_alpha_rect
+    draw_atmosphere_legend_corner --> external_pygame
+    save_npc_state --> external_datetime
+    save_npc_state --> external_json
+    save_start_npc_state_once --> save_npc_state
+    save_start_npc_state_once --> external_os
+    resolve_weather_timeline_zone --> env_state
+    compute_zone_sector_weather --> external_EMX_COMPLEX_ZONE_THRESHOLD_SCALE
+    compute_zone_sector_weather --> external_math
+    draw_corner_panels --> draw_alpha_rect
+    draw_corner_panels --> draw_atmosphere_legend_corner
+    draw_emx_panel --> external_EMX_COLORS
+    draw_emx_panel --> external_PERSONALITY_COLORS
+    draw_emx_panel --> external_compute_emx_archetype
+    draw_emx_panel --> external_math
+    draw_emx_panel --> external_pygame
+    draw_weather_panel --> env_state
+    draw_weather_panel --> compute_zone_sector_weather
+    draw_weather_panel --> resolve_weather_timeline_zone
+    draw_weather_panel --> external_EMX_COLORS
+    draw_weather_panel --> external_pygame
+    draw_cell_grid_overlay --> env_state
+    draw_cell_grid_overlay --> external_EMX_COLORS
+    draw_cell_grid_overlay --> external_pygame
+    draw_tuning_panel --> external_pygame
+    draw_tuning_panel --> external_tuning
+    format_zone_complexes --> env_state
+    build_snapshot_lines --> format_zone_complexes
+    build_snapshot_lines --> format_zone_distribution
+    build_snapshot_lines --> sim_state
+    build_snapshot_lines --> external_constants
+    draw_game_snapshot_panel --> build_snapshot_lines
+    draw_game_snapshot_panel --> snapshot_line_color
+    draw_game_snapshot_panel --> snapshot_wrap
+    draw_game_snapshot_panel --> external_pygame
+    draw_controls_panel --> external_pygame
+    build_vertical_edge_tabs --> external_pygame
+    build_edge_tabs --> build_vertical_edge_tabs
+    build_edge_tabs --> compact_world_tab_label
+    build_edge_tabs --> view_tab_color
+    draw_edge_tabs --> build_edge_tabs
+    draw_edge_tabs --> external_pygame
+    build_horizontal_scrollbar_metrics --> external_pygame
+    resolve_edge_tab_action --> build_edge_tabs
+    render_view --> runtime_state
+    render_view --> draw_anchor_fields
+    render_view --> draw_anchors
+    render_view --> draw_atmosphere
+    render_view --> draw_atmosphere_indicators
+    render_view --> draw_cell_grid_overlay
+    render_view --> draw_controls_panel
+    render_view --> draw_corner_panels
+    render_view --> draw_edge_tabs
+    render_view --> draw_emx_panel
+    render_view --> draw_game_snapshot_panel
+    render_view --> draw_load_menu
+    render_view --> draw_npc_inspector
+    render_view --> draw_npcs
+    render_view --> draw_statistics_dashboard
+    render_view --> draw_tuning_panel
+    render_view --> draw_weather_panel
+    draw_load_menu --> external_pygame

@@ -1,0 +1,23 @@
+%%{init: {
+    "theme": "base",
+    "themeVariables": {
+        "primaryColor": "#ffffff",
+        "primaryTextColor": "#00a000",
+        "primaryBorderColor": "#00a000",
+        "lineColor": "#00a000",
+        "textColor": "#00a000",
+        "clusterBkg": "#ffffff",
+        "clusterBorder": "#00a000"
+    },
+    "flowchart": {
+        "htmlLabels": false,
+        "useMaxWidth": false,
+        "nodeSpacing": 40,
+        "rankSpacing": 80,
+        "curve": "basis"
+    }
+}}%%
+flowchart TD
+    FILE[rendering.py]
+    NO_CLASSES[No top-level classes detected]
+    FILE --> NO_CLASSES

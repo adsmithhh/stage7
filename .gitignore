@@ -1,0 +1,55 @@
+# ──────────────────────────────────────────────
+# stage7 .gitignore
+# ──────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Runtime-generated data
+data/saves/
+data/npc_states/
+data/summaries/
+
+# Legacy / archived code (side-effect of evolution)
+old/
+
+# Local dev utilities (token wrappers, etc.)
+scripts/
+
+# Architecture extraction notes (personal process)
+cashes/
+
+# Config runtime state (generated NPC snapshots)
+config/npc_states/
+config/data/
+
+# Windows artifacts
+*.lnk
+Thumbs.db
+Desktop.ini
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+
+# Gemini agent workspace
+.agents/

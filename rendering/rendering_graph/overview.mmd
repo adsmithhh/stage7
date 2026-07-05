@@ -1,0 +1,85 @@
+%%{init: {
+    "theme": "base",
+    "themeVariables": {
+        "primaryColor": "#ffffff",
+        "primaryTextColor": "#00a000",
+        "primaryBorderColor": "#00a000",
+        "lineColor": "#00a000",
+        "textColor": "#00a000",
+        "clusterBkg": "#ffffff",
+        "clusterBorder": "#00a000"
+    },
+    "flowchart": {
+        "htmlLabels": false,
+        "useMaxWidth": false,
+        "nodeSpacing": 40,
+        "rankSpacing": 80,
+        "curve": "basis"
+    }
+}}%%
+flowchart LR
+    FILE[rendering.py]
+    IMPORT_SUMMARY[Import modules: 9]
+    SYMBOL_SUMMARY[Imported symbols: 40]
+    FUNCTION_SUMMARY[Top-level functions: 46]
+    CLASS_SUMMARY[Classes: 0]
+    FILE --> IMPORT_SUMMARY
+    FILE --> SYMBOL_SUMMARY
+    FILE --> FUNCTION_SUMMARY
+    FILE --> CLASS_SUMMARY
+    subgraph MODULES[Imported modules]
+    module___future[__future__]
+    IMPORT_SUMMARY --> module___future
+    module_config_constants[config.constants]
+    IMPORT_SUMMARY --> module_config_constants
+    module_datetime[datetime]
+    IMPORT_SUMMARY --> module_datetime
+    module_emx_api[emx.api]
+    IMPORT_SUMMARY --> module_emx_api
+    module_json[json]
+    IMPORT_SUMMARY --> module_json
+    module_math[math]
+    IMPORT_SUMMARY --> module_math
+    module_os[os]
+    IMPORT_SUMMARY --> module_os
+    module_pygame[pygame]
+    IMPORT_SUMMARY --> module_pygame
+    module_tuning_api[tuning.api]
+    IMPORT_SUMMARY --> module_tuning_api
+    end
+    subgraph FUNCTION_GROUPS[Function groups]
+    group_draw[draw layer: 19]
+    FUNCTION_SUMMARY --> group_draw
+    group_build[build layer: 8]
+    FUNCTION_SUMMARY --> group_build
+    group_format[format layer: 2]
+    FUNCTION_SUMMARY --> group_format
+    group_resolve[resolve layer: 2]
+    FUNCTION_SUMMARY --> group_resolve
+    group_save[save layer: 2]
+    FUNCTION_SUMMARY --> group_save
+    group_snapshot[snapshot: 2]
+    FUNCTION_SUMMARY --> group_snapshot
+    group_compact[compact: 1]
+    FUNCTION_SUMMARY --> group_compact
+    group_compute[compute layer: 1]
+    FUNCTION_SUMMARY --> group_compute
+    group_configure[configure: 1]
+    FUNCTION_SUMMARY --> group_configure
+    group_env[environment state: 1]
+    FUNCTION_SUMMARY --> group_env
+    group_horizontal[horizontal: 1]
+    FUNCTION_SUMMARY --> group_horizontal
+    group_render[render layer: 1]
+    FUNCTION_SUMMARY --> group_render
+    group_reset[reset layer: 1]
+    FUNCTION_SUMMARY --> group_reset
+    group_runtime[runtime state: 1]
+    FUNCTION_SUMMARY --> group_runtime
+    group_sim[simulation state: 1]
+    FUNCTION_SUMMARY --> group_sim
+    group_stable[stable: 1]
+    FUNCTION_SUMMARY --> group_stable
+    group_view[view: 1]
+    FUNCTION_SUMMARY --> group_view
+    end

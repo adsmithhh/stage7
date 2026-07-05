@@ -1,0 +1,138 @@
+status: INVALID
+observation_window_ticks: 500
+total_observations: 86763
+tick_range: !!python/tuple
+- 100
+- 29020
+timestamp: '2026-05-15T08:31:08.508715'
+metric_results:
+  zone_density_HOME:
+    metric_name: zone_density_HOME
+    observed_value: 0.729625
+    acceptable_min: 0.05
+    acceptable_max: 0.4
+    is_valid: false
+    deviation_percent: 82.40624999999997
+    notes: NPCs cycle through HOME; 10-35% normal depending on shift phase
+  zone_density_SCIENCE:
+    metric_name: zone_density_SCIENCE
+    observed_value: 0.006958333333333333
+    acceptable_min: 0.02
+    acceptable_max: 0.4
+    is_valid: false
+    deviation_percent: -65.20833333333333
+    notes: ''
+  zone_density_TRADE:
+    metric_name: zone_density_TRADE
+    observed_value: 0.0165
+    acceptable_min: 0.02
+    acceptable_max: 0.4
+    is_valid: false
+    deviation_percent: -17.5
+    notes: ''
+  zone_density_DEVELOPMENT:
+    metric_name: zone_density_DEVELOPMENT
+    observed_value: 0.0
+    acceptable_min: 0.0
+    acceptable_max: 0.4
+    is_valid: true
+    deviation_percent: 0.0
+    notes: 'Can be near-zero: ZONE 3 intentionally sets efficiency_scale=0.0 for DEVELOPMENT'
+  zone_density_FLEX:
+    metric_name: zone_density_FLEX
+    observed_value: 0.24433333333333335
+    acceptable_min: 0.02
+    acceptable_max: 0.45
+    is_valid: true
+    deviation_percent: 0.0
+    notes: ''
+  emx_saturation:
+    metric_name: emx_saturation
+    observed_value: 0.7911547619047619
+    acceptable_min: 0.6
+    acceptable_max: 1.0
+    is_valid: true
+    deviation_percent: 0.0
+    notes: 'High saturation: emotions actively driving decisions'
+  zone_atmosphere_mass:
+    metric_name: zone_atmosphere_mass
+    observed_value: 2.0
+    acceptable_min: 1.5
+    acceptable_max: 2.1
+    is_valid: true
+    deviation_percent: 0.0
+    notes: Atmosphere accumulates; capped near 2.0
+  mean_stress:
+    metric_name: mean_stress
+    observed_value: 0.0012785000000000001
+    acceptable_min: 5.0
+    acceptable_max: 40.0
+    is_valid: false
+    deviation_percent: -99.97443000000001
+    notes: Depends on zone distribution
+  std_stress:
+    metric_name: std_stress
+    observed_value: 0.0027249060282627845
+    acceptable_min: 8.0
+    acceptable_max: 38.0
+    is_valid: false
+    deviation_percent: -99.96593867464671
+    notes: High variance is realistic across 144 NPCs
+  mean_energy:
+    metric_name: mean_energy
+    observed_value: 22.117060166977094
+    acceptable_min: 45.0
+    acceptable_max: 90.0
+    is_valid: false
+    deviation_percent: -50.85097740671757
+    notes: 'Wider band: NPC energy varies by zone and phase'
+  std_energy:
+    metric_name: std_energy
+    observed_value: 22.826244565431722
+    acceptable_min: 8.0
+    acceptable_max: 35.0
+    is_valid: true
+    deviation_percent: 0.0
+    notes: ''
+  lock_rate:
+    metric_name: lock_rate
+    observed_value: 0.0008333333333333333
+    acceptable_min: 0.0
+    acceptable_max: 0.6
+    is_valid: true
+    deviation_percent: 0.0
+    notes: Lock accumulates over long runs; high rate signals fatigue saturation
+summary:
+  all_metrics_valid: false
+  invalid_metric_count: 6
+  total_metrics_checked: 12
+hazard_decision_template:
+  H1_shame_split_penalty:
+    description: "Shame penalty for current zone split across two scoring passes (0.33\
+      \ + 0.67 = 1.0\xD7 DECISION_DISGUST_PENALTY_MULTIPLIER). Formerly 'Disgust double\
+      \ penalty' \u2014 renamed Shame in Stage 5 refactor."
+    decision_required: false
+    options:
+    - CANONICAL
+    decision_value: CANONICAL
+    documentation: "Split is intentional: first pass scores zone preference, second\
+      \ scores variety/novelty. Total equals 1\xD7 multiplier, not a double-count."
+  H3_event_engine:
+    description: "active_events parameter accepted by compute_work_result but not\
+      \ applied \u2014 event multipliers disconnected"
+    decision_required: true
+    options:
+    - DORMANT
+    - IMPLEMENT_POST_BASELINE
+    decision_value: '[PLACEHOLDER: USER SETS]'
+    documentation: DORMANT = intended for future. IMPLEMENT_POST_BASELINE = incomplete,
+      needs fixing.
+  H4_trust_engine:
+    description: Trust/social influence is a stub (returns all zeros)
+    decision_required: true
+    options:
+    - DORMANT
+    - IMPLEMENT_POST_BASELINE
+    decision_value: '[PLACEHOLDER: USER SETS]'
+    documentation: DORMANT = field-mediated-only coupling is OK for now. IMPLEMENT
+      = add direct NPC-to-NPC influence.

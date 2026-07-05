@@ -1,0 +1,40 @@
+system:
+  name: jj_runtime
+  purpose: Orchestrated simulation platform using API-mediated package architecture.
+  root: .
+
+entrypoints:
+  - jj.py
+
+authoritative_packages:
+  - runtime: "Application lifecycle and orchestration"
+  - simulation: "World engine, NPCs, and doctrine"
+  - rendering: "Visual projection and UI"
+  - emx: "Emotional field engine"
+  - persistence: "Save/load and state continuity"
+  - tuning: "Runtime parameter calibration"
+  - config: "Static schemas and overrides"
+  - diagnostics: "Architectural and behavioral validation"
+
+core_files:
+  - jj.py
+  - runtime/app_runtime.py
+  - simulation/simulation.py
+  - rendering/rendering.py
+  - emx/emx_system.py
+
+data_schemas:
+  - config/int5.yaml
+  - config/emotions.yaml
+  - config/em_colors.yaml
+  - config/override.yaml
+
+runtime_requirements:
+  python_packages:
+    - pygame
+    - PyYAML
+
+evolution_state:
+  current: Stage 4 (API Surface Mediation)
+  target: Stage 5 (Boundary Enforcement)
+  cleanup_status: "Legacy root shims removed"

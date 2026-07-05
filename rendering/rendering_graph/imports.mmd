@@ -1,0 +1,119 @@
+%%{init: {
+    "theme": "base",
+    "themeVariables": {
+        "primaryColor": "#ffffff",
+        "primaryTextColor": "#00a000",
+        "primaryBorderColor": "#00a000",
+        "lineColor": "#00a000",
+        "textColor": "#00a000",
+        "clusterBkg": "#ffffff",
+        "clusterBorder": "#00a000"
+    },
+    "flowchart": {
+        "htmlLabels": false,
+        "useMaxWidth": false,
+        "nodeSpacing": 40,
+        "rankSpacing": 80,
+        "curve": "basis"
+    }
+}}%%
+flowchart TD
+    FILE[rendering.py]
+    module___future[__future__]
+    FILE --> module___future
+    future___annotations[annotations]
+    module___future --> future___annotations
+    module_config_constants[config.constants]
+    FILE --> module_config_constants
+    config_constants__CENTRAL_COL[_CENTRAL_COL]
+    module_config_constants --> config_constants__CENTRAL_COL
+    config_constants__PANTHEON_COL[_PANTHEON_COL]
+    module_config_constants --> config_constants__PANTHEON_COL
+    config_constants_BLUE[BLUE]
+    module_config_constants --> config_constants_BLUE
+    config_constants_color_map[color_map]
+    module_config_constants --> config_constants_color_map
+    config_constants_DEV_COLOR[DEV_COLOR]
+    module_config_constants --> config_constants_DEV_COLOR
+    config_constants_EMOTIONAL_COMPLEXES[EMOTIONAL_COMPLEXES]
+    module_config_constants --> config_constants_EMOTIONAL_COMPLEXES
+    config_constants_EMX_CELL_GRID_COLS[EMX_CELL_GRID_COLS]
+    module_config_constants --> config_constants_EMX_CELL_GRID_COLS
+    config_constants_EMX_CELL_GRID_ENABLED[EMX_CELL_GRID_ENABLED]
+    module_config_constants --> config_constants_EMX_CELL_GRID_ENABLED
+    config_constants_EMX_CELL_GRID_ROWS[EMX_CELL_GRID_ROWS]
+    module_config_constants --> config_constants_EMX_CELL_GRID_ROWS
+    config_constants_EMX_CELL_OVERLAY_ALPHA[EMX_CELL_OVERLAY_ALPHA]
+    module_config_constants --> config_constants_EMX_CELL_OVERLAY_ALPHA
+    config_constants_EMX_COLORS[EMX_COLORS]
+    module_config_constants --> config_constants_EMX_COLORS
+    config_constants_EMX_COMPLEX_SECOND_THRESHOLD[EMX_COMPLEX_SECOND_THRESHOLD]
+    module_config_constants --> config_constants_EMX_COMPLEX_SECOND_THRESHOLD
+    config_constants_EMX_COMPLEX_TOP_THRESHOLD[EMX_COMPLEX_TOP_THRESHOLD]
+    module_config_constants --> config_constants_EMX_COMPLEX_TOP_THRESHOLD
+    config_constants_EMX_COMPLEX_ZONE_THRESHOLD_SCALE[EMX_COMPLEX_ZONE_THRESHOLD_SCALE]
+    module_config_constants --> config_constants_EMX_COMPLEX_ZONE_THRESHOLD_SCALE
+    config_constants_EMX_EMOTIONS[EMX_EMOTIONS]
+    module_config_constants --> config_constants_EMX_EMOTIONS
+    config_constants_EMX_WEATHER_PANEL_SECTORS[EMX_WEATHER_PANEL_SECTORS]
+    module_config_constants --> config_constants_EMX_WEATHER_PANEL_SECTORS
+    config_constants_FLEX_COLOR[FLEX_COLOR]
+    module_config_constants --> config_constants_FLEX_COLOR
+    config_constants_HEIGHT[HEIGHT]
+    module_config_constants --> config_constants_HEIGHT
+    config_constants_INSPECTOR_ZONE_ORDER[INSPECTOR_ZONE_ORDER]
+    module_config_constants --> config_constants_INSPECTOR_ZONE_ORDER
+    config_constants_LIME[LIME]
+    module_config_constants --> config_constants_LIME
+    config_constants_NPC_DYAD_COLORS[NPC_DYAD_COLORS]
+    module_config_constants --> config_constants_NPC_DYAD_COLORS
+    config_constants_NPC_STATE_EXPORT_DIR[NPC_STATE_EXPORT_DIR]
+    module_config_constants --> config_constants_NPC_STATE_EXPORT_DIR
+    config_constants_NPC_STATE_EXPORT_ENABLED[NPC_STATE_EXPORT_ENABLED]
+    module_config_constants --> config_constants_NPC_STATE_EXPORT_ENABLED
+    config_constants_NPC_STATE_START_SNAPSHOT_TICK[NPC_STATE_START_SNAPSHOT_TICK]
+    module_config_constants --> config_constants_NPC_STATE_START_SNAPSHOT_TICK
+    config_constants_ORANGE[ORANGE]
+    module_config_constants --> config_constants_ORANGE
+    config_constants_PANTHEON[PANTHEON]
+    module_config_constants --> config_constants_PANTHEON
+    config_constants_PANTHEON_TIERS[PANTHEON_TIERS]
+    module_config_constants --> config_constants_PANTHEON_TIERS
+    config_constants_PERSONALITY_COLORS[PERSONALITY_COLORS]
+    module_config_constants --> config_constants_PERSONALITY_COLORS
+    config_constants_RED_ORANGE[RED_ORANGE]
+    module_config_constants --> config_constants_RED_ORANGE
+    config_constants_SHARED_ZONE_CONFIG[SHARED_ZONE_CONFIG]
+    module_config_constants --> config_constants_SHARED_ZONE_CONFIG
+    config_constants_SHARED_ZONES[SHARED_ZONES]
+    module_config_constants --> config_constants_SHARED_ZONES
+    config_constants_TEAL[TEAL]
+    module_config_constants --> config_constants_TEAL
+    config_constants_TRADE_COLOR[TRADE_COLOR]
+    module_config_constants --> config_constants_TRADE_COLOR
+    config_constants_WHITE[WHITE]
+    module_config_constants --> config_constants_WHITE
+    config_constants_WIDTH[WIDTH]
+    module_config_constants --> config_constants_WIDTH
+    config_constants_YELLOW_TEXT[YELLOW_TEXT]
+    module_config_constants --> config_constants_YELLOW_TEXT
+    module_datetime[datetime]
+    FILE --> module_datetime
+    datetime_datetime[datetime]
+    module_datetime --> datetime_datetime
+    module_emx_api[emx.api]
+    FILE --> module_emx_api
+    emx_api_compute_anchor_field[compute_anchor_field]
+    module_emx_api --> emx_api_compute_anchor_field
+    emx_api_compute_emx_archetype[compute_emx_archetype]
+    module_emx_api --> emx_api_compute_emx_archetype
+    module_json[json]
+    FILE --> module_json
+    module_math[math]
+    FILE --> module_math
+    module_os[os]
+    FILE --> module_os
+    module_pygame[pygame]
+    FILE --> module_pygame
+    module_tuning_api[tuning.api]
+    FILE --> module_tuning_api

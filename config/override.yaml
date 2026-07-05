@@ -1,0 +1,80 @@
+# All values assumed in [0, 100]
+# Each override defines how PAD is reshaped by emotion intensity E
+
+overrides:
+
+  joy:
+    replaces: P
+    formulas:
+      joy: "clamp(P + 0.7 * E)"
+      A:   "clamp(A + 0.3 * E)"
+      D:   "clamp(D + 0.1 * E)"
+
+  anger:
+    replaces: P
+    formulas:
+      anger: "clamp(E)"
+      A:     "clamp(A + 0.5 * E)"
+      D:     "clamp(D + 0.4 * E)"
+
+  fear:
+    replaces: D
+    formulas:
+      fear: "clamp(E)"
+      P:    "clamp(P - 0.3 * fear)"
+      A:    "clamp(A + 0.4 * fear)"
+      D*:   "clamp(100 - fear)"   # implicit D if needed
+
+  sadness:
+    replaces: D
+    formulas:
+      sadness: "clamp(E)"
+      P:       "clamp(P - 0.7 * sadness)"
+      A:       "clamp(A - 0.4 * sadness)"
+
+  shame:
+    replaces: D
+    formulas:
+      shame: "clamp(E)"
+      P:     "clamp(P - 0.5 * shame)"
+      A:     "clamp(A + 0.2 * shame)"
+
+  panic:
+    replaces: A
+    formulas:
+      panic: "clamp(E)"
+      P:     "clamp(P - 0.4 * panic)"
+      D:     "clamp(D - 0.5 * panic)"
+      A*:    "clamp(panic)"       # implicit A
+
+  exhaustion:
+    replaces: A
+    formulas:
+      exhaustion: "clamp(E)"
+      P:          "clamp(P - 0.2 * exhaustion)"
+      D:          "clamp(D - 0.3 * exhaustion)"
+      A*:         "clamp(100 - exhaustion)"
+
+  calm:
+    replaces: A
+    formulas:
+      calm: "clamp(E)"
+      P:    "clamp(P + 0.4 * calm)"
+      D:    "clamp(D + 0.1 * calm)"
+      A*:   "clamp(100 - calm)"
+
+  pride:
+    replaces: D
+    formulas:
+      pride: "clamp(E)"
+      P:     "clamp(P + 0.3 * pride)"
+      A:     "clamp(A + 0.2 * pride)"
+      D*:    "clamp(pride)"
+
+  love:
+    replaces: P
+    formulas:
+      love: "clamp(E)"
+      A:    "clamp(A + 0.2 * love)"
+      D:    "clamp(D + 0.1 * love)"
+      P*:   "clamp(love)"
