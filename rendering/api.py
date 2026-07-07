@@ -5,12 +5,15 @@ from .render_types import RenderBackendStatus
 from . import render_central2 as field_runtime
 from .rendering import (
     build_horizontal_scrollbar_metrics,
+    build_vertical_scrollbar_metrics,
     build_frame_render_packet,
+    draw_viewport_scrollbars,
     horizontal_scroll_from_thumb_left,
     render_view,
     resolve_edge_tab_action,
     save_start_npc_state_once,
     save_npc_state,
+    vertical_scroll_from_thumb_top,
 )
 from . import rendering as projection_runtime
 

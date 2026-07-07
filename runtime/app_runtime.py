@@ -22,6 +22,14 @@ import tuning.api as tuning
 from diagnostics.baseline_validator import BaselineValidator
 
 LOGIC_TICKS_PER_FRAME = 2
+WINDOW_RESIZE_EVENTS = tuple(
+    event_type
+    for event_type in (
+        getattr(pygame, "VIDEORESIZE", None),
+        getattr(pygame, "WINDOWSIZECHANGED", None),
+    )
+    if event_type is not None
+)
 
 
 @dataclass
@@ -64,7 +72,7 @@ def configure_stdio() -> None:
 
 
 def print_terminal_menu_hint() -> None:
-    print("\x1b[92m[M] menu | [X] snapshot | [SPACE] pause | click edge tabs | wheel scroll | bottom scrollbar | [ESC] quit\x1b[0m")
+    print("\x1b[92m[M] menu | [X] snapshot | [SPACE] pause | click edge tabs | wheel scroll | bottom/right scrollbars | [ESC] quit\x1b[0m")
 
 
 def init_pygame(renderer_backend: RendererBackend):
@@ -169,7 +177,7 @@ def build_worlds(anchors: dict, zone_mechanics_template: dict) -> tuple[list[sim
     )
     startup_messages.append("All systems initialized.")
     startup_messages.append("Press M for the full controls list.")
-    startup_messages.append("Quick keys: X snapshot | C CENTRAL | E EMX | V weather | SPACE pause | click edge tabs | wheel scroll | bottom scrollbar")
+    startup_messages.append("Quick keys: X snapshot | C CENTRAL | E EMX | V weather | SPACE pause | click edge tabs | wheel scroll | bottom/right scrollbars")
     startup_messages.append("")
     return worlds, startup_messages
 
@@ -361,12 +369,23 @@ def handle_mouse_wheel_delta(delta_y: int, context: AppContext) -> bool:
 
 def _horizontal_scrollbar_metrics(context: AppContext):
     display_surface = pygame.display.get_surface()
-    if display_surface is None or context.render_backend_status.active != "software":
+    if display_surface is None:
         return None
     return rendering.build_horizontal_scrollbar_metrics(
         logical_size=context.screen.get_size(),
         display_size=display_surface.get_size(),
         scroll_x=context.ui_state.render_scroll_x,
+    )
+
+
+def _vertical_scrollbar_metrics(context: AppContext):
+    display_surface = pygame.display.get_surface()
+    if display_surface is None:
+        return None
+    return rendering.build_vertical_scrollbar_metrics(
+        logical_size=context.screen.get_size(),
+        display_size=display_surface.get_size(),
+        scroll_y=context.ui_state.render_scroll_y,
     )
 
 
@@ -394,25 +413,56 @@ def handle_horizontal_scrollbar_click(event, context: AppContext) -> bool:
     return False
 
 
+def handle_vertical_scrollbar_click(event, context: AppContext) -> bool:
+    metrics = _vertical_scrollbar_metrics(context)
+    if metrics is None:
+        return False
+
+    thumb_rect = metrics["thumb_rect"]
+    track_rect = metrics["track_rect"]
+    if thumb_rect.collidepoint(event.pos):
+        context.ui_state.vertical_scroll_dragging = True
+        context.ui_state.vertical_scroll_drag_offset_y = int(event.pos[1] - thumb_rect.y)
+        return True
+    if track_rect.collidepoint(event.pos):
+        context.ui_state.render_scroll_y = rendering.vertical_scroll_from_thumb_top(
+            int(event.pos[1] - thumb_rect.height // 2),
+            metrics,
+        )
+        context.ui_state.vertical_scroll_dragging = True
+        refreshed = _vertical_scrollbar_metrics(context)
+        if refreshed is not None:
+            context.ui_state.vertical_scroll_drag_offset_y = int(event.pos[1] - refreshed["thumb_rect"].y)
+        return True
+    return False
+
+
 def handle_mouse_button_up(event, context: AppContext) -> bool:
     if getattr(event, "button", None) == 1:
         context.ui_state.horizontal_scroll_dragging = False
+        context.ui_state.vertical_scroll_dragging = False
     return True
 
 
 def handle_mouse_motion(event, context: AppContext) -> bool:
-    if not context.ui_state.horizontal_scroll_dragging:
-        return True
-
-    metrics = _horizontal_scrollbar_metrics(context)
-    if metrics is None:
-        context.ui_state.horizontal_scroll_dragging = False
-        return True
-
-    context.ui_state.render_scroll_x = rendering.horizontal_scroll_from_thumb_left(
-        int(event.pos[0] - context.ui_state.horizontal_scroll_drag_offset_x),
-        metrics,
-    )
+    if context.ui_state.horizontal_scroll_dragging:
+        metrics = _horizontal_scrollbar_metrics(context)
+        if metrics is None:
+            context.ui_state.horizontal_scroll_dragging = False
+        else:
+            context.ui_state.render_scroll_x = rendering.horizontal_scroll_from_thumb_left(
+                int(event.pos[0] - context.ui_state.horizontal_scroll_drag_offset_x),
+                metrics,
+            )
+    if context.ui_state.vertical_scroll_dragging:
+        metrics = _vertical_scrollbar_metrics(context)
+        if metrics is None:
+            context.ui_state.vertical_scroll_dragging = False
+        else:
+            context.ui_state.render_scroll_y = rendering.vertical_scroll_from_thumb_top(
+                int(event.pos[1] - context.ui_state.vertical_scroll_drag_offset_y),
+                metrics,
+            )
     return True
 
 
@@ -426,18 +476,19 @@ def handle_mouse_button_down(event, context: AppContext) -> bool:
 
     if handle_horizontal_scrollbar_click(event, context):
         return True
+    if handle_vertical_scrollbar_click(event, context):
+        return True
 
     display_surface = pygame.display.get_surface()
     display_size = display_surface.get_size() if display_surface is not None else context.screen.get_size()
-    using_software_viewport = context.render_backend_status.active == "software"
     viewport_origin = (
         context.ui_state.render_scroll_x,
         context.ui_state.render_scroll_y,
-    ) if using_software_viewport else (0, 0)
+    )
     action = rendering.resolve_edge_tab_action(
         event.pos,
         logical_size=context.screen.get_size(),
-        display_size=None if using_software_viewport else display_size,
+        display_size=display_size,
         viewport_origin=viewport_origin,
         worlds=context.worlds,
         ui_state=context.ui_state,
@@ -670,6 +721,8 @@ def process_events(context: AppContext) -> bool:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return False
+        if event.type in WINDOW_RESIZE_EVENTS:
+            continue
         if event.type == pygame.KEYDOWN and not handle_keydown(event, context):
             return False
         if event.type == pygame.MOUSEWHEEL and not handle_mouse_wheel_delta(event.y, context):
@@ -806,7 +859,36 @@ def render_frame(context: AppContext) -> None:
         context.ui_state.status_message = None
         context.ui_state.status_until_ms = 0
     draw_startup_overlay(context, surface=overlay_target)
-    context.renderer_backend.present(context.screen, frame_packet, overlay_surface)
+
+    viewport_origin_x = context.ui_state.render_scroll_x
+    viewport_origin_y = context.ui_state.render_scroll_y
+    source_rect = pygame.Rect(
+        viewport_origin_x,
+        viewport_origin_y,
+        min(display_width, max(0, context.screen.get_width() - viewport_origin_x)),
+        min(display_height, max(0, context.screen.get_height() - viewport_origin_y)),
+    )
+
+    frame_viewport = pygame.Surface((display_width, display_height)).convert_alpha()
+    frame_viewport.fill(constants.PURPLE)
+    if source_rect.width > 0 and source_rect.height > 0:
+        frame_viewport.blit(context.screen, (0, 0), area=source_rect)
+
+    overlay_viewport = pygame.Surface((display_width, display_height), pygame.SRCALPHA)
+    if overlay_surface is not None and source_rect.width > 0 and source_rect.height > 0:
+        overlay_viewport.blit(overlay_surface, (0, 0), area=source_rect)
+
+    rendering.draw_viewport_scrollbars(
+        overlay_viewport,
+        logical_size=context.screen.get_size(),
+        display_size=(display_width, display_height),
+        scroll_x=context.ui_state.render_scroll_x,
+        scroll_y=context.ui_state.render_scroll_y,
+        horizontal_dragging=context.ui_state.horizontal_scroll_dragging,
+        vertical_dragging=context.ui_state.vertical_scroll_dragging,
+    )
+
+    context.renderer_backend.present(frame_viewport, frame_packet, overlay_viewport)
     context.clock.tick(constants.FPS)
 
 

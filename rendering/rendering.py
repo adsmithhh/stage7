@@ -1343,7 +1343,7 @@ def draw_controls_panel(surface, fonts):
             "TAB    - Switch active territory",
             "MOUSE  - Click edge tabs to switch territory or view",
             "WHEEL  - Scroll vertically when the window is shorter than the canvas",
-            "DRAG   - Use the bottom scrollbar to pan horizontally",
+            "DRAG   - Bottom scrollbar pans horizontally; right scrollbar pans vertically",
             "ESC    - Exit simulation",
         ]),
         ("Panels", [
@@ -1525,7 +1525,7 @@ def build_horizontal_scrollbar_metrics(
     scroll_x: int,
 ):
     display_width, display_height = display_size
-    logical_width, _ = logical_size
+    logical_width, logical_height = logical_size
     if display_width <= 0 or display_height <= 0:
         return None
 
@@ -1536,7 +1536,8 @@ def build_horizontal_scrollbar_metrics(
     margin_x = 14
     bottom_margin = 8
     track_height = 16
-    track_width = max(96, display_width - margin_x * 2)
+    reserve_right = track_height + 6 if logical_height > display_height else 0
+    track_width = max(96, display_width - margin_x * 2 - reserve_right)
     track_rect = pygame.Rect(
         margin_x,
         max(6, display_height - bottom_margin - track_height),
@@ -1566,6 +1567,55 @@ def build_horizontal_scrollbar_metrics(
     }
 
 
+def build_vertical_scrollbar_metrics(
+    *,
+    logical_size: tuple[int, int],
+    display_size: tuple[int, int],
+    scroll_y: int,
+):
+    display_width, display_height = display_size
+    logical_width, logical_height = logical_size
+    if display_width <= 0 or display_height <= 0:
+        return None
+
+    max_scroll_y = max(0, logical_height - display_height)
+    if max_scroll_y <= 0:
+        return None
+
+    margin_y = 14
+    right_margin = 8
+    track_width = 16
+    reserve_bottom = track_width + 6 if logical_width > display_width else 0
+    track_height = max(96, display_height - margin_y * 2 - reserve_bottom)
+    track_rect = pygame.Rect(
+        max(6, display_width - right_margin - track_width),
+        margin_y,
+        track_width,
+        track_height,
+    )
+
+    thumb_height = max(52, int(round(track_rect.height * (display_height / logical_height))))
+    thumb_height = min(track_rect.height, thumb_height)
+    travel_height = max(0, track_rect.height - thumb_height)
+    clamped_scroll_y = max(0, min(int(scroll_y), max_scroll_y))
+    thumb_top = track_rect.y
+    if travel_height > 0 and max_scroll_y > 0:
+        thumb_top += int(round((clamped_scroll_y / max_scroll_y) * travel_height))
+
+    thumb_rect = pygame.Rect(
+        track_rect.x + 2,
+        thumb_top,
+        max(8, track_rect.width - 4),
+        thumb_height,
+    )
+    return {
+        "track_rect": track_rect,
+        "thumb_rect": thumb_rect,
+        "max_scroll_y": max_scroll_y,
+        "travel_height": travel_height,
+    }
+
+
 def horizontal_scroll_from_thumb_left(thumb_left: int, metrics) -> int:
     travel_width = int(metrics.get("travel_width", 0))
     max_scroll_x = int(metrics.get("max_scroll_x", 0))
@@ -1580,6 +1630,60 @@ def horizontal_scroll_from_thumb_left(thumb_left: int, metrics) -> int:
     return int(round(ratio * max_scroll_x))
 
 
+def vertical_scroll_from_thumb_top(thumb_top: int, metrics) -> int:
+    travel_height = int(metrics.get("travel_height", 0))
+    max_scroll_y = int(metrics.get("max_scroll_y", 0))
+    track_rect = metrics["track_rect"]
+    thumb_rect = metrics["thumb_rect"]
+    min_top = track_rect.y
+    max_top = track_rect.bottom - thumb_rect.height
+    clamped_top = max(min_top, min(int(thumb_top), max_top))
+    if travel_height <= 0 or max_scroll_y <= 0:
+        return 0
+    ratio = (clamped_top - min_top) / travel_height
+    return int(round(ratio * max_scroll_y))
+
+
+def draw_viewport_scrollbars(
+    surface,
+    *,
+    logical_size: tuple[int, int],
+    display_size: tuple[int, int],
+    scroll_x: int,
+    scroll_y: int,
+    horizontal_dragging: bool = False,
+    vertical_dragging: bool = False,
+) -> None:
+    horizontal = build_horizontal_scrollbar_metrics(
+        logical_size=logical_size,
+        display_size=display_size,
+        scroll_x=scroll_x,
+    )
+    vertical = build_vertical_scrollbar_metrics(
+        logical_size=logical_size,
+        display_size=display_size,
+        scroll_y=scroll_y,
+    )
+
+    if horizontal is not None:
+        track_rect = horizontal["track_rect"]
+        thumb_rect = horizontal["thumb_rect"]
+        pygame.draw.rect(surface, (16, 20, 30, 220), track_rect, border_radius=8)
+        pygame.draw.rect(surface, (90, 104, 128, 235), track_rect, width=1, border_radius=8)
+        thumb_fill = (220, 228, 240, 245) if horizontal_dragging else (184, 194, 214, 235)
+        pygame.draw.rect(surface, thumb_fill, thumb_rect, border_radius=7)
+        pygame.draw.rect(surface, (70, 84, 106, 235), thumb_rect, width=1, border_radius=7)
+
+    if vertical is not None:
+        track_rect = vertical["track_rect"]
+        thumb_rect = vertical["thumb_rect"]
+        pygame.draw.rect(surface, (16, 20, 30, 220), track_rect, border_radius=8)
+        pygame.draw.rect(surface, (90, 104, 128, 235), track_rect, width=1, border_radius=8)
+        thumb_fill = (220, 228, 240, 245) if vertical_dragging else (184, 194, 214, 235)
+        pygame.draw.rect(surface, thumb_fill, thumb_rect, border_radius=7)
+        pygame.draw.rect(surface, (70, 84, 106, 235), thumb_rect, width=1, border_radius=7)
+
+
 def resolve_edge_tab_action(
     display_pos,
     *,
@@ -1590,21 +1694,10 @@ def resolve_edge_tab_action(
     ui_state,
     fonts,
 ):
-    if display_size is None or display_size[0] <= 0 or display_size[1] <= 0:
-        logical_pos = (
-            int(display_pos[0]) + int(viewport_origin[0]),
-            int(display_pos[1]) + int(viewport_origin[1]),
-        )
-    elif viewport_origin != (0, 0):
-        logical_pos = (
-            int(display_pos[0]) + int(viewport_origin[0]),
-            int(display_pos[1]) + int(viewport_origin[1]),
-        )
-    else:
-        logical_pos = (
-            int(display_pos[0] * logical_size[0] / display_size[0]),
-            int(display_pos[1] * logical_size[1] / display_size[1]),
-        )
+    logical_pos = (
+        int(display_pos[0]) + int(viewport_origin[0]),
+        int(display_pos[1]) + int(viewport_origin[1]),
+    )
 
     for tab in _build_edge_tabs(logical_size, worlds, ui_state, fonts):
         if tab["rect"].collidepoint(logical_pos):

@@ -54,6 +54,8 @@ class UIState:
     render_scroll_y: int = 0
     horizontal_scroll_dragging: bool = False
     horizontal_scroll_drag_offset_x: int = 0
+    vertical_scroll_dragging: bool = False
+    vertical_scroll_drag_offset_y: int = 0
 
 @dataclass
 class Commitment:
