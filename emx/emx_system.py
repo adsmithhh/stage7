@@ -66,6 +66,33 @@ EMOTION_TO_IDX = {emotion: idx for idx, emotion in enumerate(EMX_EMOTIONS)}
 INTERLEAVE_WINDOW = 5
 
 
+def _build_emx_tick_context(world, env_state: EnvironmentState, tick: int = 0) -> dict[str, object]:
+    active_npcs = []
+    work_npcs = []
+    home_npcs = []
+    work_zone_counts = {zone: 0 for zone in WORK_ZONES}
+
+    for npc in world.npcs:
+        if npc.state == "AT_HOME":
+            home_npcs.append(npc)
+            continue
+
+        active_npcs.append(npc)
+        if npc.state == "AT_WORK":
+            work_npcs.append(npc)
+            if npc.zone in work_zone_counts:
+                work_zone_counts[npc.zone] += 1
+
+    return {
+        "active_npcs": active_npcs,
+        "work_npcs": work_npcs,
+        "home_npcs": home_npcs,
+        "work_zone_counts": work_zone_counts,
+        "zone_complexes": env_state.zone_complexes,
+        "tick": tick,
+    }
+
+
 def configure_runtime(*, anchors: dict | None = None) -> None:
     global ANCHORS
     if anchors is not None:
@@ -169,15 +196,15 @@ def _trait_label(traits: dict) -> str:
     return label_map.get(dominant, "Unknown")
 
 
-def update_emx(world, env_state: EnvironmentState, tick: int = 0):
+def update_emx(world, env_state: EnvironmentState, tick: int = 0, precomputed: dict | None = None):
     """Drive Plutchik emotions from existing NPC stats — foundation for dependency system."""
-    # ENHANCED: Calculate zone populations for emotional contagion
-    zone_populations = {}
-    for zone in WORK_ZONES:
-        count = sum(1 for npc in world.npcs if npc.zone == zone and npc.state == "AT_WORK")
-        zone_populations[zone] = count
+    if precomputed is None:
+        precomputed = _build_emx_tick_context(world, env_state, tick)
 
-    for npc in world.npcs:
+    zone_populations = precomputed.get("work_zone_counts", {})
+    work_npcs = precomputed.get("work_npcs", [npc for npc in world.npcs if npc.state == "AT_WORK"])
+
+    for npc in work_npcs:
         e = npc.emx
         s  = npc.stress_endured / 100.0
         en = npc.energy / 100.0
@@ -295,8 +322,7 @@ def update_emx(world, env_state: EnvironmentState, tick: int = 0):
             # NEW: RAPID EMOTION DECAY when leaving crowded zones
             # When NPCs escape the zone cluster, their amplified emotions rapidly decrease
             # Emotions that were boosted by contagion (Anger, Disgust, etc.) fade quickly
-            last_zone_pop = sum(1 for npc_check in world.npcs
-                               if npc_check.zone == npc.last_zone and npc_check.state == "AT_WORK")
+            last_zone_pop = zone_populations.get(npc.last_zone, 0)
 
             if last_zone_pop >= 3:  # They just left a crowded zone
                 decay_strength = 0.15 + (last_zone_pop - 3) * 0.05  # Stronger decay for larger crowds
@@ -349,19 +375,20 @@ def update_emx(world, env_state: EnvironmentState, tick: int = 0):
         npc.emx_dyad = compute_npc_dyad(npc.emx)
 
 
-def update_atmosphere(world, env_state: EnvironmentState, tick: int):
+def update_atmosphere(world, env_state: EnvironmentState, tick: int, precomputed: dict | None = None):
     """Emotional weather: NPCs emit, opposites cancel, complexes emerge."""
     atm = env_state.zone_atmosphere
+
+    if precomputed is None:
+        precomputed = _build_emx_tick_context(world, env_state, tick)
 
     # Store complexes for visualization in EnvironmentState
     zone_complexes = env_state.zone_complexes
     weather_history = env_state.zone_weather_history
 
     # ENHANCED: Calculate zone densities for emotional resonance
-    zone_density = {}
-    for zone in atm:
-        count = sum(1 for npc in world.npcs if npc.zone == zone and npc.state == "AT_WORK")
-        zone_density[zone] = count
+    zone_density = precomputed.get("work_zone_counts", {})
+    work_npcs = precomputed.get("work_npcs", [npc for npc in world.npcs if npc.state == "AT_WORK"])
 
     # 1. Decay
     for zone in atm:
@@ -370,16 +397,15 @@ def update_atmosphere(world, env_state: EnvironmentState, tick: int):
 
     # 2. ENHANCED: Emit with DENSITY-BASED RESONANCE AMPLIFICATION
     # INTERLEAVED: Only 1/5 NPCs emit per tick, scaled by 5.0
-    for npc in world.npcs:
-        if npc.state == "AT_WORK" and npc.zone in atm:
-            if (tick + npc.id) % INTERLEAVE_WINDOW == 0:
-                density = zone_density.get(npc.zone, 1)
-                resonance_multiplier = 1.0 + (density - 1) * 0.3
-                resonance_multiplier = min(2.5, resonance_multiplier)
+    for npc in work_npcs:
+        if npc.zone in atm and (tick + npc.id) % INTERLEAVE_WINDOW == 0:
+            density = zone_density.get(npc.zone, 1)
+            resonance_multiplier = 1.0 + (density - 1) * 0.3
+            resonance_multiplier = min(2.5, resonance_multiplier)
 
-                for e in EMX_EMOTIONS:
-                    emission = npc.emx.get(e, 0.0) * EMX_WEATHER_EMIT_RATE * resonance_multiplier * INTERLEAVE_WINDOW
-                    atm[npc.zone][e] = min(1.0, atm[npc.zone][e] + emission)
+            for e in EMX_EMOTIONS:
+                emission = npc.emx.get(e, 0.0) * EMX_WEATHER_EMIT_RATE * resonance_multiplier * INTERLEAVE_WINDOW
+                atm[npc.zone][e] = min(1.0, atm[npc.zone][e] + emission)
 
     # 3. Plutchik cancellation
     for zone in atm:
@@ -435,21 +461,20 @@ def update_atmosphere(world, env_state: EnvironmentState, tick: int):
 
     # 5. Absorb - now with complex effects
     # INTERLEAVED: Only 1/5 NPCs absorb per tick, scaled by 5.0
-    for npc in world.npcs:
-        if npc.state == "AT_WORK" and npc.zone in atm:
-            if (tick + npc.id) % INTERLEAVE_WINDOW == 0:
-                # Normal absorption
-                for e in EMX_EMOTIONS:
-                    npc.emx[e] = max(0.0, min(1.0, npc.emx[e] + atm[npc.zone].get(e, 0.0) * EMX_WEATHER_ABSORB_RATE * INTERLEAVE_WINDOW))
+    for npc in work_npcs:
+        if npc.zone in atm and (tick + npc.id) % INTERLEAVE_WINDOW == 0:
+            # Normal absorption
+            for e in EMX_EMOTIONS:
+                npc.emx[e] = max(0.0, min(1.0, npc.emx[e] + atm[npc.zone].get(e, 0.0) * EMX_WEATHER_ABSORB_RATE * INTERLEAVE_WINDOW))
 
-                if EMX_CELL_GRID_ENABLED and env_state.cell_atmosphere:
-                    cols = EMX_CELL_GRID_COLS
-                    rows = EMX_CELL_GRID_ROWS
-                    cell_idx = cell_index_for_position(npc.x, npc.y, cols, rows)
-                    if 0 <= cell_idx < len(env_state.cell_atmosphere):
-                        local_atm = env_state.cell_atmosphere[cell_idx]
-                        for e in EMX_EMOTIONS:
-                            npc.emx[e] = max(0.0, min(1.0, npc.emx[e] + local_atm.get(e, 0.0) * EMX_CELL_ABSORB_RATE * INTERLEAVE_WINDOW))
+            if EMX_CELL_GRID_ENABLED and env_state.cell_atmosphere:
+                cols = EMX_CELL_GRID_COLS
+                rows = EMX_CELL_GRID_ROWS
+                cell_idx = cell_index_for_position(npc.x, npc.y, cols, rows)
+                if 0 <= cell_idx < len(env_state.cell_atmosphere):
+                    local_atm = env_state.cell_atmosphere[cell_idx]
+                    for e in EMX_EMOTIONS:
+                        npc.emx[e] = max(0.0, min(1.0, npc.emx[e] + local_atm.get(e, 0.0) * EMX_CELL_ABSORB_RATE * INTERLEAVE_WINDOW))
 
             # Complex effects on NPCs (Subtle behavioral nudges, keep every tick as they are tiny)
             complex_data = zone_complexes.get(npc.zone)
@@ -505,7 +530,7 @@ def ensure_cell_grid_state(env_state: EnvironmentState):
         env_state._anchor_field_sums = [[0.0] * num_emotions for _ in range(cell_count)]
 
 
-def compute_anchor_field(zone_name: str, world, zone_stats: dict, tick: int) -> tuple:
+def compute_anchor_field(zone_name: str, world, zone_stats: dict, tick: int, precomputed: dict | None = None) -> tuple:
     """
     Returns (radius: float, intensity: float, color: tuple) for each anchor's dynamic field.
     """
@@ -514,14 +539,21 @@ def compute_anchor_field(zone_name: str, world, zone_stats: dict, tick: int) -> 
         SHARED_ZONE_CONFIG, PANTHEON, PANTHEON_TIERS
     )
     BASE  = 28.0
-    npcs  = world.npcs
+    if precomputed is None:
+        precomputed = {}
+
+    npcs = precomputed.get("active_npcs", world.npcs)
+    work_npcs = precomputed.get("work_npcs")
+    home_npcs = precomputed.get("home_npcs")
     total = max(1, len(npcs))
     zs    = zone_stats.get(zone_name)
 
     if zone_name == "SCIENCE":
         eff   = zs.efficiency_rating if zs else 0.5
+        if work_npcs is None:
+            work_npcs = [n for n in npcs if n.state == "AT_WORK"]
         know  = sum(n.factor_skills.get("KNOWLEDGE", 0.0)
-                    for n in npcs if n.zone == zone_name and n.state == "AT_WORK")
+                    for n in work_npcs if n.zone == zone_name)
         pop   = zs.current_population if zs else 0
         know_avg = know / max(1, pop)
         intensity = eff * 0.6 + know_avg * 0.4
@@ -539,8 +571,10 @@ def compute_anchor_field(zone_name: str, world, zone_stats: dict, tick: int) -> 
     elif zone_name == "DEVELOPMENT":
         eff   = zs.efficiency_rating if zs else 0.5
         occ   = (zs.current_population / max(1, total)) if zs else 0.0
+        if work_npcs is None:
+            work_npcs = [n for n in npcs if n.state == "AT_WORK"]
         energy_out = sum(n.factor_skills.get("ENERGY", 0.0)
-                         for n in npcs if n.zone == zone_name and n.state == "AT_WORK")
+                         for n in work_npcs if n.zone == zone_name)
         pop   = zs.current_population if zs else 0
         e_avg = energy_out / max(1, pop)
         intensity = eff * 0.5 + occ * 0.3 + e_avg * 0.2
@@ -549,8 +583,10 @@ def compute_anchor_field(zone_name: str, world, zone_stats: dict, tick: int) -> 
 
     elif zone_name == "FLEX":
         pop      = zs.current_population if zs else 0
-        stresses = [n.stress_endured for n in npcs
-                    if n.zone == zone_name and n.state == "AT_WORK"]
+        if work_npcs is None:
+            work_npcs = [n for n in npcs if n.state == "AT_WORK"]
+        stresses = [n.stress_endured for n in work_npcs
+                    if n.zone == zone_name]
         avg_s    = (sum(stresses) / len(stresses)) if stresses else 50.0
         relief   = max(0.0, 1.0 - avg_s / 100.0)
         occ      = min(1.0, pop / max(1, total * 0.25))
@@ -559,16 +595,20 @@ def compute_anchor_field(zone_name: str, world, zone_stats: dict, tick: int) -> 
         color     = FLEX_COLOR
 
     elif zone_name == "HOME":
-        home_pop = sum(1 for n in npcs if n.state == "AT_HOME")
+        if home_npcs is None:
+            home_npcs = [n for n in npcs if n.state == "AT_HOME"]
+        home_pop = len(home_npcs)
         frac     = home_pop / total
-        avg_e    = (sum(n.energy for n in npcs if n.state == "AT_HOME") /
+        avg_e    = (sum(n.energy for n in home_npcs) /
                     max(1, home_pop))
         intensity = frac * 0.6 + (avg_e / 100.0) * 0.4
         radius    = BASE + frac * 55 + (avg_e / 100.0) * 20
         color     = WHITE
 
     elif zone_name == "CENTRAL":
-        central_npcs = [n for n in npcs if n.zone == "CENTRAL" and n.state == "AT_WORK"]
+        if work_npcs is None:
+            work_npcs = [n for n in npcs if n.state == "AT_WORK"]
+        central_npcs = [n for n in work_npcs if n.zone == "CENTRAL"]
         crowd        = len(central_npcs)
         cfg          = SHARED_ZONE_CONFIG["CENTRAL"]
         avg_sn       = (sum(getattr(n, 'social_need', 0.5) for n in central_npcs)
@@ -582,7 +622,9 @@ def compute_anchor_field(zone_name: str, world, zone_stats: dict, tick: int) -> 
     elif zone_name == "PANTHEON":
         tier         = PANTHEON.tier
         mat_prog     = PANTHEON.material_progress
-        contributors = sum(1 for n in npcs if n.zone == "PANTHEON" and n.state == "AT_WORK")
+        if work_npcs is None:
+            work_npcs = [n for n in npcs if n.state == "AT_WORK"]
+        contributors = sum(1 for n in work_npcs if n.zone == "PANTHEON")
         tier_norm    = min(1.0, tier / max(1, len(PANTHEON_TIERS)))
         contrib_norm = min(1.0, contributors / 6.0)
         intensity    = tier_norm * 0.5 + mat_prog * 0.3 + contrib_norm * 0.2
@@ -640,9 +682,12 @@ def _build_anchor_cell_cache(env_state: EnvironmentState):
     env_state._anchor_cache_valid = True
 
 
-def update_cell_atmosphere(world, env_state: EnvironmentState, tick: int = 0):
+def update_cell_atmosphere(world, env_state: EnvironmentState, tick: int = 0, precomputed: dict | None = None):
     if not EMX_CELL_GRID_ENABLED:
         return
+
+    if precomputed is None:
+        precomputed = _build_emx_tick_context(world, env_state, tick)
 
     ensure_cell_grid_state(env_state)
     cols = EMX_CELL_GRID_COLS
@@ -667,10 +712,10 @@ def update_cell_atmosphere(world, env_state: EnvironmentState, tick: int = 0):
         for e_idx, emotion in enumerate(EMX_EMOTIONS):
             env_state._cell_old[idx][e_idx] = cell_dict.get(emotion, 0.0)
 
+    active_npcs = precomputed.get("active_npcs", [npc for npc in world.npcs if npc.state != "AT_HOME"])
+
     # INTERLEAVED: Only 1/5 NPCs contribute to cell atmosphere per tick
-    for npc in world.npcs:
-        if npc.state == "AT_HOME":
-            continue
+    for npc in active_npcs:
         if (tick + npc.id) % INTERLEAVE_WINDOW == 0:
             idx = cell_index_for_position(npc.x, npc.y, cols, rows)
             env_state._cell_populations[idx] += 1
@@ -682,7 +727,7 @@ def update_cell_atmosphere(world, env_state: EnvironmentState, tick: int = 0):
     env_state._cached_anchor_fields.clear()
     for zone_name in _anchors_now:
         if zone_name in ANCHOR_EMX_SIGNATURE:
-            radius, intensity, _ = compute_anchor_field(zone_name, world, world.zone_stats, 0)
+            radius, intensity, _ = compute_anchor_field(zone_name, world, world.zone_stats, tick, precomputed=precomputed)
             env_state._cached_anchor_fields[zone_name] = (radius, intensity)
 
     # Accumulate anchor fields using cached distances and signatures:
@@ -751,9 +796,7 @@ def update_cell_atmosphere(world, env_state: EnvironmentState, tick: int = 0):
 
     # CENTRAL snapshot load:
     _SNAPSHOT_RATE = 1.0
-    for npc in world.npcs:
-        if npc.state == "AT_HOME":
-            continue
+    for npc in active_npcs:
         if (tick + npc.id) % INTERLEAVE_WINDOW == 0:
             idx = cell_index_for_position(npc.x, npc.y, cols, rows)
             if idx not in env_state._central_cell_idxs:

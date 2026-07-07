@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import random
+import time
 
 from config.constants import (
     ALL_ZONES,
@@ -58,6 +59,7 @@ from emx.api import (
     update_social_need, compute_emx_sensitivity_from_traits,
     compute_emx_base_from_traits, _trait_label
 )
+from emx.emx_system import _build_emx_tick_context
 from .doctrine import update_central_doctrine
 
 
@@ -394,6 +396,26 @@ def _compute_basin_attractions(zone_basins) -> dict[str, float]:
     return basin_attractions
 
 
+DECISION_THROTTLE = 4
+TIMING_LOG_INTERVAL = 1000
+
+
+def _build_decision_precompute(zone_basins, zone_complexes) -> dict[str, object]:
+    return {
+        "basin_attractions": _compute_basin_attractions(zone_basins),
+        "zone_complexes": zone_complexes if isinstance(zone_complexes, dict) else {},
+    }
+
+
+def _log_tick_timings(tick: int, total_elapsed: float, doctrine_elapsed: float, emx_elapsed: float, decision_elapsed: float, npc_count: int) -> None:
+    if tick % TIMING_LOG_INTERVAL != 0:
+        return
+    print(
+        f"⏱ [Tick {tick}] npc={npc_count} total={total_elapsed:.4f}s "
+        f"doctrine={doctrine_elapsed:.4f}s emx={emx_elapsed:.4f}s decision={decision_elapsed:.4f}s"
+    )
+
+
 def _apply_current_complex_behavior(score: float, zone_name: str, current_zone: str, current_complex) -> float:
     if not (current_complex and isinstance(current_complex, dict)):
         return score
@@ -696,10 +718,9 @@ def decide_intent(
     zone_complexes=None,
     zone_basins=None,
     zone_modifiers=None,
-    sim_state: SimulationState = None
+    sim_state: SimulationState = None,
+    precomputed=None,
 ):
-    # Injection-ready best_recovery_zone
-    zone = best_recovery_zone(npc_view, sim_state) if sim_state else "HOME"
     allowed = allowed_work_zones(npc_view, diss_threshold, tick)
     doctrine_override = _doctrine_intent_override(npc_view, allowed)
     if doctrine_override is not None:
@@ -730,21 +751,29 @@ def decide_intent(
         )
 
     if not allowed:
+        zone = best_recovery_zone(npc_view, sim_state) if sim_state else "HOME"
         return Intent(npc_id=npc_view.id, desired_zone=zone, phase_label="NO_ENERGY", confidence=0.0)
-    if npc_view.state == "AT_WORK":
-        return Intent(npc_id=npc_view.id, desired_zone=npc_view.zone, phase_label="WORKING", confidence=1.0)
+
+    if tick % DECISION_THROTTLE != 0:
+        return Intent(
+            npc_id=npc_view.id,
+            desired_zone=npc_view.zone or "HOME",
+            phase_label="INERTIA",
+            confidence=0.7,
+        )
 
     phase = _decision_phase(npc_view)
-    basin_attractions = _compute_basin_attractions(zone_basins)
-    resolved_zone_complexes = zone_complexes if isinstance(zone_complexes, dict) else {}
+    if precomputed is None:
+        precomputed = _build_decision_precompute(zone_basins, zone_complexes)
+
+    basin_attractions = precomputed.get("basin_attractions", {})
+    resolved_zone_complexes = precomputed.get("zone_complexes", {})
     current_complex = resolved_zone_complexes.get(npc_view.zone, {})
 
     scores = {}
     last_work_zone = getattr(npc_view, "last_work_zone", None)
     repeated_work_loops = getattr(npc_view, "repeated_work_loops", 0)
-    for zone_name in ALL_ZONES:
-        if zone_name not in allowed and zone_name != "HOME":
-            continue
+    for zone_name in allowed | {"HOME"}:
         score = _base_zone_score(
             npc_view,
             zone_name,
@@ -1355,20 +1384,28 @@ def apply_shared_zone_behavior(world, tick):
 
 
 def simtick(world: World, tick: int, world_state: WorldRuntimeState, anchors: dict):
+    tick_start = time.perf_counter()
     sim_state = world_state.sim_state
     env_state = world_state.env_state
     update_social_need(world)
+    doctrine_start = time.perf_counter()
     apply_shared_zone_behavior(world, tick)
     update_central_doctrine(world, tick, sim_state)
+    doctrine_elapsed = time.perf_counter() - doctrine_start
     update_zone_occupancy(world, tick)
-    update_emx(world, env_state, tick)
-    update_atmosphere(world, env_state, tick)
-    update_cell_atmosphere(world, env_state, tick)
+    emx_start = time.perf_counter()
+    emx_precompute = _build_emx_tick_context(world, env_state, tick)
+    update_emx(world, env_state, tick, precomputed=emx_precompute)
+    update_atmosphere(world, env_state, tick, precomputed=emx_precompute)
+    update_cell_atmosphere(world, env_state, tick, precomputed=emx_precompute)
+    emx_elapsed = time.perf_counter() - emx_start
     zone_density, zone_stats_view = refresh_world_zone_stats(world)
     update_zone_basins(world, sim_state)
+    decision_precompute = _build_decision_precompute(sim_state.zone_basins, env_state.zone_complexes)
     snapshot = build_snapshot(world, tick, zone_density, zone_stats_view)
     buffers = TickBuffers(snapshot=snapshot)
     npc_by_id = {npc.id: npc for npc in world.npcs}
+    decision_start = time.perf_counter()
     for npc_id, npc_view in snapshot.npc.items():
         npc = npc_by_id.get(npc_id)
         if npc is None:
@@ -1392,7 +1429,8 @@ def simtick(world: World, tick: int, world_state: WorldRuntimeState, anchors: di
             zone_complexes=env_state.zone_complexes,
             zone_basins=sim_state.zone_basins,
             zone_modifiers=world.zone_modifiers,
-            sim_state=sim_state
+            sim_state=sim_state,
+            precomputed=decision_precompute,
         )
 
         if intent.desired_zone == "HOME":
@@ -1400,6 +1438,7 @@ def simtick(world: World, tick: int, world_state: WorldRuntimeState, anchors: di
             set_home_rest(npc, tick, 4, 10)
         else:
             npc.prepared_intent = intent.desired_zone
+    decision_elapsed = time.perf_counter() - decision_start
     buffers.commitments, buffers.breaks = commit_phase(snapshot, world)
     buffers.moves = move_phase(snapshot, buffers.commitments, anchors)
     for npc_id, npc_view in snapshot.npc.items():
@@ -1414,5 +1453,7 @@ def simtick(world: World, tick: int, world_state: WorldRuntimeState, anchors: di
         if flag:
             buffers.collapse[npc_id] = flag
     apply_commit_reality(world, buffers, anchors)
+    total_elapsed = time.perf_counter() - tick_start
+    _log_tick_timings(tick, total_elapsed, doctrine_elapsed, emx_elapsed, decision_elapsed, len(world.npcs))
     log_basin_state(sim_state, tick)
     return buffers
